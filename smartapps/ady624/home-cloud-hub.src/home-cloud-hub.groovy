@@ -24,8 +24,9 @@
  *
  *  Version history
  *
- *
- *  v0.1.04.28.16 - Added Follow Location Mode option for AT&T
+ *  v0.1.next //todo //location mode mappings
+ *  v0.1.04.06.16 - Replaced Follow Location Mode with Sync Location Mode and added Sync Smart Home Monitor option for AT&T. Thank you Keo for the idea
+ *  v0.1.03.28.16 - Added Follow Location Mode option for AT&T
  *  v0.1.03.23.16 - Updated location sync method
  *  v0.1.03.22.16 - Initial beta release
  *
@@ -76,21 +77,21 @@ def prefWelcome() {
         }
         section() {
             href(name: "href",
-                 title: "Use the Home Cloud Hub service",
-                 required: false,
-                 params: [next: true, hchLocal: false],
-                 page: "prefHCH",
-                 description: "Select this if you have an account with www.homecloudhub.com",
-                 state: !state.ihch.useLocalServer ? "complete" : null)
-        }
-        section() {
-            href(name: "href",
                  title: "Use a local Home Cloud Hub server you installed",
                  required: false,
                  params: [next: true, hchLocal: true],
                  page: "prefHCH",
                  description: "Select this if you have already installed a local server in your network",
                  state: state.ihch.useLocalServer ? "complete" : null)
+        }
+        section() {
+            href(name: "href",
+                 title: "Use the Home Cloud Hub service",
+                 required: false,
+                 params: [next: true, hchLocal: false],
+                 page: "prefHCH",
+                 description: "Select this if you have an account with www.homecloudhub.com",
+                 state: !state.ihch.useLocalServer ? "complete" : null)
         }
     }
 }
@@ -225,7 +226,8 @@ def prefATT() {
             }
             section("Permissions") {
 				input("attControllable", "bool", title: "Control AT&T Digital Life", required: true, defaultValue: true)
-				input("attFollowMode", "bool", title: "Follow Location Mode", required: true, defaultValue: true)
+				input("attSyncLocationMode", "bool", title: "Sync Location Mode", required: true, defaultValue: true)
+				input("attSyncSmartHomeMonitor", "bool", title: "Sync Smart Home Monitor", required: true, defaultValue: true)
             }
     	}
 	} else {
@@ -388,7 +390,8 @@ private doATTLogin(installing, force) {
     hch.security[module_name] = [
     	'enabled': !!(settings.attUsername || settings.attPassword),
         'controllable': settings.attControllable,
-        'followMode': settings.attFollowMode,
+        'syncLocationMode': settings.attSyncLocationMode,
+        'syncSmartHomeMonitor': settings.attSyncSmartHomeMonitor,
         'connected': false
     ]
     //check if the AT&T Digital Life module is enabled
@@ -580,13 +583,16 @@ def initialize() {
 	state.hch.usesATT = !!(settings.attUsername || settings.attPassword)
 	state.hch.usesIFTTT = !!settings.iftttKey
     
-    if (state.hch.usesATT && settings.attControllable && settings.attFollowMode) {
-    	/* subscribe to SmartThings Home Monitor to allow sync with AT&T Digital Life status */
-		//subscribe(location, "alarmSystemStatus", shmHandler)
-        
-        /* subscribe to mode changes to allow sync with AT&T Digital Life */
-        subscribe(location, modeChangeHandler)
-   }
+    if ((state.hch.usesATT) && (settings.attControllable)) {
+    	if (settings.attSyncLocationMode) {
+	        /* subscribe to mode changes to allow sync with AT&T Digital Life */
+	        subscribe(location, modeChangeHandler)
+        }
+    	if (settings.attSyncSmartHomeMonitor) {        
+    		/* subscribe to SmartThings Home Monitor to allow sync with AT&T Digital Life status */
+			subscribe(location, "alarmSystemStatus", shmHandler)
+        }
+    }
 	if (state.hch.useLocalServer) {
 		//listen to LAN incoming messages
 		subscribe(location, null, lanEventHandler, [filterEvents:false])
@@ -637,7 +643,7 @@ def shmHandler(evt) {
 	        }
         }
  	}
-    return true;
+    //return true;
 }
 
 def modeChangeHandler(event) {
@@ -646,7 +652,7 @@ def modeChangeHandler(event) {
     	return
     }
     if (event.name == 'mode') {
-        log.info "Received notification of SmartThings Mode having changed to ${event.value}"
+        log.info "Received notification of Location Mode having changed to ${event.value}"
         def mode = null;
         switch (event.value) {
             case 'Home':
@@ -671,7 +677,7 @@ def modeChangeHandler(event) {
                 }
             }
         }
-        return true;
+        //return true;
 	}
 }
 
@@ -841,7 +847,7 @@ private processEvent(data) {
             	key = key.substring(5);
                 def oldValue = device.currentValue(key);
                 if (oldValue != value) {
-                    device.sendEvent(name: key, value: value);
+					device.sendEvent(name: key, value: value);
                     //list of capabilities
                     //http://docs.smartthings.com/en/latest/capabilities-reference.html
 
@@ -869,29 +875,29 @@ private processEvent(data) {
                                     shmState = 'stay'
                                     break                        
                             }
-                            if (mode) {
+							if (mode) {
                             	//set device mode
                                 if (mode != device.currentValue('mode')) {
                                     log.info 'Switching Digital Life mode from ' + device.currentValue('mode') + ' to ' + mode
 	                                device.sendEvent(name: 'mode', value: mode);
                                 }
                                 //sync location mode
-                                if (mode != location.mode) {
+                                if ((settings.attSyncLocationMode) && (mode != location.mode)) {
                                     log.info 'Switching location mode from ' + location.mode + ' to ' + mode
                                     location.setMode(mode);
                                 }
-                            }
-                            //sync SmartThings Home Monitor
-                            //def currentShmState = location.currentState('alarmSystemStatus')?.value
-                            //if (shmState && (shmState != currentShmState)) {
-                                //log.info 'Switching SmartThings Home Monitor from ' + currentShmState + ' to ' + shmState
-                                //sendLocationEvent(name: 'alarmSystemStatus', value: shmState)
-                            //}
-                        }                    
-                    }
-                }
-            }
-        }
+                            	//sync SmartThings Home Monitor
+                            	def currentShmState = location.currentState('alarmSystemStatus')?.value
+                            	if ((settings.attSyncSmartHomeMonitor) && (shmState) && (shmState != currentShmState)) {
+                                	log.info 'Switching SmartThings Home Monitor from ' + currentShmState + ' to ' + shmState
+                                	sendLocationEvent(name: 'alarmSystemStatus', value: shmState)
+                            	}
+							}
+                    	}
+                	}
+            	}
+        	}
+    	}
     }
     if (state.hch.usesIFTTT && (eventName == 'update') && deviceModule && deviceId && eventName && eventValue && (eventValue != 'undefined')) {
     	//we need to proxy the event to IFTTT

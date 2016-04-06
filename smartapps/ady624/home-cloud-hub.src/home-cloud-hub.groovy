@@ -25,6 +25,7 @@
  *  Version history
  *
  *  v0.1.next //todo //location mode mappings
+ *  v0.1.04.06.16b - Added support for switch level (sending event to set the level as well as the mode)
  *  v0.1.04.06.16 - Replaced Follow Location Mode with Sync Location Mode and added Sync Smart Home Monitor option for AT&T. Thank you Keo for the idea
  *  v0.1.03.28.16 - Added Follow Location Mode option for AT&T
  *  v0.1.03.23.16 - Updated location sync method
@@ -856,22 +857,27 @@ private processEvent(data) {
                         if ((deviceType == 'digital-life-system') && (key == 'system-status')) {
                             log.info "Digital Life alarm status changed from ${oldValue} to ${value}"
                             def mode = null;
-                            def shmState = null;
+                            def level = null;
+                            def shmState = null;                            
                             switch (value) {
                                 case 'Home':
                                     mode = 'Home'
+                                    level = 0
                                     shmState = 'off'
                                     break
                                 case 'Away':
                                     mode = 'Away'
+                                    level = 2
                                     shmState = 'away'
                                     break
                                 case 'Stay':
                                     mode = 'Night'
+                                    level = 1
                                     shmState = 'stay'
                                     break
                                 case 'Instant':
                                     mode = 'Night'
+                                    level = 1
                                     shmState = 'stay'
                                     break                        
                             }
@@ -880,6 +886,7 @@ private processEvent(data) {
                                 if (mode != device.currentValue('mode')) {
                                     log.info 'Switching Digital Life mode from ' + device.currentValue('mode') + ' to ' + mode
 	                                device.sendEvent(name: 'mode', value: mode);
+                                    device.sendEvent(name: 'level', value: level);
                                 }
                                 //sync location mode
                                 if ((settings.attSyncLocationMode) && (mode != location.mode)) {

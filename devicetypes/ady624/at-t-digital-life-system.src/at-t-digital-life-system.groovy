@@ -16,6 +16,7 @@
  *  Version history
  *
  *
+ *  v0.1.04.06.16 - Removed Location Mode capability - might interfere with Rule Machine
  *  v0.1.03.24.16 - Published device as switch to allow easy manipulation via rules - on() sets it to away
  *                  and off() sets it to home. Also published commands setMode(mode), home(), away(), stay().
  *					You can now also use it as a "Switch Level" by setting the level to 0 for home, 1 for stay
@@ -26,11 +27,11 @@
 metadata {
 	definition (name: "AT&T Digital Life System", namespace: "ady624", author: "Adrian Caramaliu", oauth: true) {
 		capability "Actuator"
-		capability "Location Mode"
         capability "Refresh"
         capability "Configuration"
         capability "Switch"
         capability "Switch Level"
+        attribute "mode", "string"
         attribute "id", "string"
         attribute "module", "string"       
         attribute "type", "string"
@@ -121,16 +122,22 @@ def configure(mode) {
 }
 
 def setLevel(level) {
+	if (level < 0) {
+    	level = 0
+    }
+    if (level > 2) {
+    	level = 2
+    }
 	switch (level) {
     	case 0:
-        	home();
-            break;
+        	home()
+            break
     	case 1:
-        	stay();
-            break;
+        	stay()
+            break
     	default:
-        	away();
-            break;
+        	away()
+            break
     }
 }
 
@@ -140,16 +147,16 @@ def setMode(mode) {
     	case 'disarm':
     	case 'disarmed':
     	case 'off':
-        	home();
-            break;
+        	home()
+            break
     	case 'stay':
     	case 'instant':
     	case 'night':
-        	stay();
-            break;
+        	stay()
+            break
     	case 'away':
-        	away();
-            break;
+        	away()
+            break
     }
 }
 

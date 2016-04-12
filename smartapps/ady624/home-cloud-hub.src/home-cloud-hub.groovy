@@ -25,6 +25,7 @@
  *  Version history
  *
  *  v0.1.next //todo //location mode mappings
+ *  v0.1.04.12.16 - Added support for AT&T Digital Life switch (switch is "off" when alarm is disarmed and "on" when the alarm is in stay/away/instant mode)
  *  v0.1.04.06.16b - Added support for switch level (sending event to set the level as well as the mode)
  *  v0.1.04.06.16 - Replaced Follow Location Mode with Sync Location Mode and added Sync Smart Home Monitor option for AT&T. Thank you Keo for the idea
  *  v0.1.03.28.16 - Added Follow Location Mode option for AT&T
@@ -858,27 +859,32 @@ private processEvent(data) {
                             log.info "Digital Life alarm status changed from ${oldValue} to ${value}"
                             def mode = null;
                             def level = null;
+                            def sweetch = null; //can't use "switch"
                             def shmState = null;                            
                             switch (value) {
-                                case 'Home':
-                                    mode = 'Home'
+                                case "Home":
+                                    mode = "Home"
                                     level = 0
-                                    shmState = 'off'
+                                    sweetch = "off"
+                                    shmState = "off"
                                     break
-                                case 'Away':
-                                    mode = 'Away'
+                                case "Away":
+                                    mode = "Away"
                                     level = 2
-                                    shmState = 'away'
+                                    sweetch = "on"
+                                    shmState = "away"
                                     break
-                                case 'Stay':
-                                    mode = 'Night'
+                                case "Stay":
+                                    mode = "Night"
                                     level = 1
-                                    shmState = 'stay'
+                                    sweetch = "on"
+                                    shmState = "stay"
                                     break
-                                case 'Instant':
-                                    mode = 'Night'
+                                case "Instant":
+                                    mode = "Night"
                                     level = 1
-                                    shmState = 'stay'
+                                    sweetch = "on"
+                                    shmState = "stay"
                                     break                        
                             }
 							if (mode) {
@@ -887,6 +893,7 @@ private processEvent(data) {
                                     log.info 'Switching Digital Life mode from ' + device.currentValue('mode') + ' to ' + mode
 	                                device.sendEvent(name: 'mode', value: mode);
                                     device.sendEvent(name: 'level', value: level);
+                                    device.sendEvent(name: 'switch', value: sweetch);
                                 }
                                 //sync location mode
                                 if ((settings.attSyncLocationMode) && (mode != location.mode)) {

@@ -87,6 +87,8 @@ Create a new system username to run homecloudhub under:
 
         sudo chown homecloudhub:homecloudhub /var/node/homecloudhub.local/config/homecloudhub.json 
 
+**NOTE**: Some Operating Systems may require the .service extension within the systemd ecosystem. CentOS/RedHat seems to be one of them, according to Keo (thank you). Debian seems to not need it.
+
 Create the /etc/default/homecloudhub file with this content:
 
     # Defaults / Configuration options for homecloudhub

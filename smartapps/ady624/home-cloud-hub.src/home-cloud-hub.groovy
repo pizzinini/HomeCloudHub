@@ -3,6 +3,15 @@
  *
  *  Copyright 2016 Adrian Caramaliu
  *
+ *  NOTE: This application requires a local server connected to the same network as your SmartThings hub.
+ *        Find more info at https://github.com/ady624/HomeCloudHub
+ *
+ *  Many thanks to users Keo (https://community.smartthings.com/users/Keo) and swanny (https://community.smartthings.com/users/swanny)
+ *  for providing both the drive (https://community.smartthings.com/t/integration-with-at-t-digital-life/4082) and the basic code example
+ *  to get me started with SmartApps. Although most of Keo's original code is no longer in this application, it saved me time
+ *  figuring out how to move around with the SmartApp, this being my first SmartApp to date. I actually bought the SmartThings hub
+ *  for this integration alone (and ended up using it for other things too).
+ *
  *  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
  *  in compliance with the License. You may obtain a copy of the License at:
  *
@@ -12,7 +21,19 @@
  *  on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License
  *  for the specific language governing permissions and limitations under the License.
  *
- */
+ *
+ *  Version history
+ *
+ *  v0.1.next //todo //location mode mappings
+ *  v0.1.04.12.16 - Added support for AT&T Digital Life switch (switch is "off" when alarm is disarmed and "on" when the alarm is in stay/away/instant mode)
+ *  v0.1.04.06.16b - Added support for switch level (sending event to set the level as well as the mode)
+ *  v0.1.04.06.16 - Replaced Follow Location Mode with Sync Location Mode and added Sync Smart Home Monitor option for AT&T. Thank you Keo for the idea
+ *  v0.1.03.28.16 - Added Follow Location Mode option for AT&T
+ *  v0.1.03.23.16 - Updated location sync method
+ *  v0.1.03.22.16 - Initial beta release
+ *
+**/
+
 definition(
     name: "Home Cloud Hub",
     namespace: "ady624",
@@ -58,21 +79,21 @@ def prefWelcome() {
         }
         section() {
             href(name: "href",
-                 title: "Use the Home Cloud Hub service",
-                 required: false,
-                 params: [next: true, hchLocal: false],
-                 page: "prefHCH",
-                 description: "Select this if you have an account with www.homecloudhub.com",
-                 state: !state.ihch.useLocalServer ? "complete" : null)
-        }
-        section() {
-            href(name: "href",
                  title: "Use a local Home Cloud Hub server you installed",
                  required: false,
                  params: [next: true, hchLocal: true],
                  page: "prefHCH",
                  description: "Select this if you have already installed a local server in your network",
                  state: state.ihch.useLocalServer ? "complete" : null)
+        }
+        section() {
+            href(name: "href",
+                 title: "Use the Home Cloud Hub service",
+                 required: false,
+                 params: [next: true, hchLocal: false],
+                 page: "prefHCH",
+                 description: "Select this if you have an account with www.homecloudhub.com",
+                 state: !state.ihch.useLocalServer ? "complete" : null)
         }
     }
 }
@@ -207,6 +228,8 @@ def prefATT() {
             }
             section("Permissions") {
 				input("attControllable", "bool", title: "Control AT&T Digital Life", required: true, defaultValue: true)
+				input("attSyncLocationMode", "bool", title: "Sync Location Mode", required: true, defaultValue: true)
+				input("attSyncSmartHomeMonitor", "bool", title: "Sync Smart Home Monitor", required: true, defaultValue: true)
             }
     	}
 	} else {
@@ -369,6 +392,8 @@ private doATTLogin(installing, force) {
     hch.security[module_name] = [
     	'enabled': !!(settings.attUsername || settings.attPassword),
         'controllable': settings.attControllable,
+        'syncLocationMode': settings.attSyncLocationMode,
+        'syncSmartHomeMonitor': settings.attSyncSmartHomeMonitor,
         'connected': false
     ]
     //check if the AT&T Digital Life module is enabled
@@ -560,13 +585,16 @@ def initialize() {
 	state.hch.usesATT = !!(settings.attUsername || settings.attPassword)
 	state.hch.usesIFTTT = !!settings.iftttKey
     
-    if (state.hch.usesATT && settings.attControllable) {
-    	/* subscribe to SmartThings Home Monitor to allow sync with AT&T Digital Life status */
-		//subscribe(location, "alarmSystemStatus", shmHandler)
-        
-        /* subscribe to mode changes to allow sync with AT&T Digital Life */
-        subscribe(location, modeChangeHandler)
-   }
+    if ((state.hch.usesATT) && (settings.attControllable)) {
+    	if (settings.attSyncLocationMode) {
+	        /* subscribe to mode changes to allow sync with AT&T Digital Life */
+	        subscribe(location, modeChangeHandler)
+        }
+    	if (settings.attSyncSmartHomeMonitor) {        
+    		/* subscribe to SmartThings Home Monitor to allow sync with AT&T Digital Life status */
+			subscribe(location, "alarmSystemStatus", shmHandler)
+        }
+    }
 	if (state.hch.useLocalServer) {
 		//listen to LAN incoming messages
 		subscribe(location, null, lanEventHandler, [filterEvents:false])
@@ -617,12 +645,16 @@ def shmHandler(evt) {
 	        }
         }
  	}
-    return true;
+    //return true;
 }
 
 def modeChangeHandler(event) {
+	//abort if not controllable or not following mode
+	if ((!settings.attControllable) || (!settings.attFollowMode)) {
+    	return
+    }
     if (event.name == 'mode') {
-        log.info "Received notification of SmartThings Mode having changed to ${event.value}"
+        log.info "Received notification of Location Mode having changed to ${event.value}"
         def mode = null;
         switch (event.value) {
             case 'Home':
@@ -647,7 +679,7 @@ def modeChangeHandler(event) {
                 }
             }
         }
-        return true;
+        //return true;
 	}
 }
 
@@ -663,9 +695,8 @@ private searchForLocalServer() {
 def lanEventHandler(evt) {
     def description = evt.description
     def hub = evt?.hubId
-
 	def parsedEvent = parseLanMessage(description)
-
+	
 	//discovery
 	if (parsedEvent.ssdpTerm && parsedEvent.ssdpTerm.contains(getLocalServerURN())) {
         atomicState.hchLocalServerIp = convertHexToIP(parsedEvent.networkAddress)
@@ -804,7 +835,8 @@ private processEvent(data) {
         		device.sendEvent(name: 'module', value: deviceModule);
         		device.sendEvent(name: 'type', value: deviceType);
             } catch(e) {
-            	log.info 'Home Cloud Hub discovered a device that is not yet supported by your hub. Please find and install the [' + deviceHandler + '] device handler from https://github.com/ady624/SmartThingsPublic/tree/master/devicetypes/ady624'
+            	log.info "Home Cloud Hub discovered a device that is not yet supported by your hub. Please find and install the [${deviceHandler}] device handler from https://github.com/ady624/HomeCloudHub/tree/master/devicetypes/ady624"
+            	log.info "If the repository is missing the [${deviceHandler}] device handler, please provide the device data to the author of this software so he can add it. Thank you. Device data is [${data}]"
             }
         }
     }
@@ -817,7 +849,7 @@ private processEvent(data) {
             	key = key.substring(5);
                 def oldValue = device.currentValue(key);
                 if (oldValue != value) {
-                    device.sendEvent(name: key, value: value);
+					device.sendEvent(name: key, value: value);
                     //list of capabilities
                     //http://docs.smartthings.com/en/latest/capabilities-reference.html
 
@@ -826,45 +858,60 @@ private processEvent(data) {
                         if ((deviceType == 'digital-life-system') && (key == 'system-status')) {
                             log.info "Digital Life alarm status changed from ${oldValue} to ${value}"
                             def mode = null;
-                            def shmState = null;
+                            def level = null;
+                            def sweetch = null; //can't use "switch"
+                            def shmState = null;                            
                             switch (value) {
-                                case 'Home':
-                                    mode = 'Home'
-                                    shmState = 'off'
+                                case "Home":
+                                    mode = "Home"
+                                    level = 0
+                                    sweetch = "off"
+                                    shmState = "off"
                                     break
-                                case 'Away':
-                                    mode = 'Away'
-                                    shmState = 'away'
+                                case "Away":
+                                    mode = "Away"
+                                    level = 2
+                                    sweetch = "on"
+                                    shmState = "away"
                                     break
-                                case 'Stay':
-                                    mode = 'Night'
-                                    shmState = 'stay'
+                                case "Stay":
+                                    mode = "Night"
+                                    level = 1
+                                    sweetch = "on"
+                                    shmState = "stay"
                                     break
-                                case 'Instant':
-                                    mode = 'Night'
-                                    shmState = 'stay'
+                                case "Instant":
+                                    mode = "Night"
+                                    level = 1
+                                    sweetch = "on"
+                                    shmState = "stay"
                                     break                        
                             }
-                            if (mode) {
-                                //sync location mode
-                                if ((mode != location.mode) || (mode != device.currentValue('mode'))) {
-                                    log.info 'Switching mode from ' + location.mode + ' to ' + mode
+							if (mode) {
+                            	//set device mode
+                                if (mode != device.currentValue('mode')) {
+                                    log.info 'Switching Digital Life mode from ' + device.currentValue('mode') + ' to ' + mode
 	                                device.sendEvent(name: 'mode', value: mode);
-                                    //device has "Location Mode" as capability - we don't need to set the location mode
-                                    //location.setMode(mode);
+                                    device.sendEvent(name: 'level', value: level);
+                                    device.sendEvent(name: 'switch', value: sweetch);
                                 }
-                            }
-                            //sync SmartThings Home Monitor
-                            //def currentShmState = location.currentState('alarmSystemStatus')?.value
-                            //if (shmState && (shmState != currentShmState)) {
-                                //log.info 'Switching SmartThings Home Monitor from ' + currentShmState + ' to ' + shmState
-                                //sendLocationEvent(name: 'alarmSystemStatus', value: shmState)
-                            //}
-                        }                    
-                    }
-                }
-            }
-        }
+                                //sync location mode
+                                if ((settings.attSyncLocationMode) && (mode != location.mode)) {
+                                    log.info 'Switching location mode from ' + location.mode + ' to ' + mode
+                                    location.setMode(mode);
+                                }
+                            	//sync SmartThings Home Monitor
+                            	def currentShmState = location.currentState('alarmSystemStatus')?.value
+                            	if ((settings.attSyncSmartHomeMonitor) && (shmState) && (shmState != currentShmState)) {
+                                	log.info 'Switching SmartThings Home Monitor from ' + currentShmState + ' to ' + shmState
+                                	sendLocationEvent(name: 'alarmSystemStatus', value: shmState)
+                            	}
+							}
+                    	}
+                	}
+            	}
+        	}
+    	}
     }
     if (state.hch.usesIFTTT && (eventName == 'update') && deviceModule && deviceId && eventName && eventValue && (eventValue != 'undefined')) {
     	//we need to proxy the event to IFTTT

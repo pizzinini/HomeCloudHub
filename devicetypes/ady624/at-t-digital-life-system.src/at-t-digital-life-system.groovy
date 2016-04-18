@@ -12,12 +12,26 @@
  *  on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License
  *  for the specific language governing permissions and limitations under the License.
  *
+ *
+ *  Version history
+ *
+ *
+ *  v0.1.04.06.16 - Removed Location Mode capability - might interfere with Rule Machine
+ *  v0.1.03.24.16 - Published device as switch to allow easy manipulation via rules - on() sets it to away
+ *                  and off() sets it to home. Also published commands setMode(mode), home(), away(), stay().
+ *					You can now also use it as a "Switch Level" by setting the level to 0 for home, 1 for stay
+ *                  and 2 or more for away.
+ *  v0.1.03.22.16 - Initial beta release
+ *
  */
 metadata {
 	definition (name: "AT&T Digital Life System", namespace: "ady624", author: "Adrian Caramaliu", oauth: true) {
 		capability "Actuator"
-		capability "Location Mode"
         capability "Refresh"
+        capability "Configuration"
+        capability "Switch"
+        capability "Switch Level"
+        attribute "mode", "string"
         attribute "id", "string"
         attribute "module", "string"       
         attribute "type", "string"
@@ -37,6 +51,7 @@ metadata {
         command "home"
         command "stay"
         command "away"
+        command "setMode"
 	}
 
     simulator {
@@ -103,27 +118,64 @@ def parse(String description) {
 }
 
 def configure(mode) {
-	switch (mode.toLowerCase()) {
-    	case 'home':
-        	home();
-            break;
-    	case 'stay':
-        	stay();
-            break;
-    	case 'away':
-        	away();
-            break;
+	setMode(mode)
+}
+
+def setLevel(level) {
+	if (level < 0) {
+    	level = 0
+    }
+    if (level > 2) {
+    	level = 2
+    }
+	switch (level) {
+    	case 0:
+        	home()
+            break
+    	case 1:
+        	stay()
+            break
+    	default:
+        	away()
+            break
     }
 }
 
+def setMode(mode) {
+	switch (mode.toLowerCase()) {
+    	case 'home':
+    	case 'disarm':
+    	case 'disarmed':
+    	case 'off':
+        	home()
+            break
+    	case 'stay':
+    	case 'instant':
+    	case 'night':
+        	stay()
+            break
+    	case 'away':
+        	away()
+            break
+    }
+}
+
+def on() {
+	away()
+}
+
+def off() {
+	home()
+}
+
 def home() {
-	log.trace parent.proxyCommand(device, 'mode', 'Home');
+	parent.proxyCommand(device, 'mode', 'Home');
 }
 
 def stay() {
-	log.trace parent.proxyCommand(device, 'mode', 'Stay');
+	parent.proxyCommand(device, 'mode', 'Stay');
 }
 
 def away() {
-	log.trace parent.proxyCommand(device, 'mode', 'Away');
+	parent.proxyCommand(device, 'mode', 'Away');
 }

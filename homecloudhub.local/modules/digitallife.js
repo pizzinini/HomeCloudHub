@@ -65,9 +65,9 @@ var exports = module.exports = new function () {
 
         //recovering procedures
         doRecover = function () {
-            if (failed) {
-                return;
-            }
+            //if (failed) {
+            //    return;
+            //}
 
             alert('Refreshing security tokens...');
             failed = true;
@@ -87,7 +87,7 @@ var exports = module.exports = new function () {
 
             //setup auto recovery
             if (tmrRecover) clearTimeout(tmrRecover);
-            tmrRecover = setTimeout(doRecover, 300000); //recover in 5 minutes if for some reason the tokens are not refreshed
+            tmrRecover = setTimeout(doRecover, 120000); //recover in 2 minutes if for some reason the tokens are not refreshed
 
             app.refreshTokens(module);
         },

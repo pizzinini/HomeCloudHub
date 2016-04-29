@@ -97,7 +97,7 @@ Create the /etc/default/homecloudhub file with this content:
     # You can display this via systemd's journalctl: journalctl -f -u homecloudhub
     # DEBUG=*
 
-Create the /etc/systemd/system/homecloudhub file with this content:
+Create the /etc/systemd/system/homecloudhub.service file with this content:
 
     [Unit]
     Description=Node.js Local Home Cloud Hub Server

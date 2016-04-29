@@ -87,10 +87,28 @@ var exports = module.exports = new function () {
 
             //setup auto recovery
             if (tmrRecover) clearTimeout(tmrRecover);
-            tmrRecover = setTimeout(doRecover, 120000); //recover in 2 minutes if for some reason the tokens are not refreshed
+            tmrRecover = setTimeout(invokeRecover, 120000); //recover in 2 minutes if for some reason the tokens are not refreshed
 
             app.refreshTokens(module);
         },
+
+		invokeRecover = function() {
+			//ensure all reasons to invoke recover are exhausted prior to actually recovering
+			//this is to avoid multiple relogins
+
+			log('invokeRecover was summoned.');
+
+            if (listener && listener.abort) {
+                try {
+                    listener.abort();
+                } catch (e) {}
+            }
+            listener = null;
+            config = {};
+
+            if (tmrRecover) clearTimeout(tmrRecover);
+            tmrRecover = setTimeout(doRecover, 5000); //recover in 5 seconds if for some reason the tokens are not refreshed
+		},
 
         //get devices
         doGetDevices = function (initial) {
@@ -181,14 +199,14 @@ var exports = module.exports = new function () {
                                     } catch (e) {
                                         //reinitialize after an error
                                         error('Error reading device list: ' + e);
-                                        doRecover();
+                                        invokeRecover();
                                         return;
                                     }
                                 }
                             }
                             //reinitialize on error
                             error('Error getting device list: ' + err);
-                            doRecover();
+                            invokeRecover();
                         });
             } catch (e) {}
         },
@@ -221,8 +239,8 @@ var exports = module.exports = new function () {
                             //log("RCVD: " + str);
                             if (tmrTimeout) clearTimeout(tmrTimeout)
                             tmrTimeout = setTimeout(function () {
-                                error("Haven't received anything in one minute, we must be disconnected...")
-                                doRecover();
+                                error("Haven't received anything in one minute, we must have been disconnected...")
+                               	invokeRecover();
                             }, 60000); //if we get nothing more in the next 60 seconds, we dropped the ball (we should get something every 30s)
                             buffer += str.replace(/\*|\n|\r/g, '');
                             var p = buffer.indexOf('"""');
@@ -238,7 +256,7 @@ var exports = module.exports = new function () {
                         } catch (e) {
                             //reinitialize after an error
                             error('Error reading listener data: ' + e);
-                            doRecover();
+                            invokeRecover();
                             return;
                         }
                     })
@@ -249,21 +267,21 @@ var exports = module.exports = new function () {
                         }
                         //reinitialize on error
                         error('Could not connect listener: ' + response.statusCode);
-                        doRecover();
+                        invokeRecover();
                     })
                     .on('end', function () {
                         //reinitialize on error
                         log('Listener connection terminated, recovering...');
-                        doRecover();
+                       invokeRecover();
                     })
                     .on('error', function (e) {
                         //reinitialize on error
                         error('An error occurred within the listener: ' + e);
-                        doRecover();
+                        invokeRecover();
                     });
             } catch (e) {
                 error('Failed to setup listener: ' + e);
-                doRecover();
+                invokeRecover();
             }
         },
 
@@ -299,7 +317,7 @@ var exports = module.exports = new function () {
             } catch (e) {
                 //reinitialize after an error
                 error('Failed to process device event: ' + e);
-                doRecover();
+                invokeRecover();
                 return;
             }
         },

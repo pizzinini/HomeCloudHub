@@ -153,7 +153,9 @@ var app = new function () {
                             response.end();
                             if (payload.server && payload.server.ip && payload.server.port) {
                                 config.server = payload.server || config.server;
-                                doSaveConfig();
+								if (config.server.ip && config.server.port) {
+	                                doSaveConfig();
+								}
                             }
                             for (module in payload.modules) {
                                 var cfg = payload.modules[module];
@@ -179,7 +181,7 @@ var app = new function () {
                         config.server = JSON.parse(data);
                         if (config.server && config.server.ip && config.server.port) {
                             log({
-                                info: 'Retrieved config with server at ' + config.server.ip + ':' + config.server.port
+                                info: 'Retrieved config with server at ' + config.server.ip + ':' + config.server.port + ' - requesting init data'
                             });
                             node.request.put({
                                 url: 'http://' + config.server.ip + ':' + config.server.port,

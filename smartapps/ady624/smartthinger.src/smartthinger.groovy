@@ -189,7 +189,7 @@ def pageMain() {
         }
         
         section() {
-			href "pageIf", title: "If...", description: getConditionDescription(0), state: null
+			href "pageIf", title: "If...", description: getConditionDescription(0), state: "complete"
 			href "pageThen", title: "Then...", description: "Choose what should happen then", state: null, submitOnChange: false
 			href "pageElse", title: "Else...", description: "Choose what should happen otherwise", state: null, submitOnChange: false
 
@@ -308,7 +308,7 @@ def pageConditionGroup(params, level) {
     	def id = condition.id
         state.config["conditionGroupIdL$level"] = id
         def pid = condition.parentId
-    	dynamicPage(name: "pageConditionGroupL$level", title: "Condition Group (level $level)", uninstall: false, install: false) {
+    	dynamicPage(name: "pageConditionGroupL$level", title: "Condition Group $id (level $level)", uninstall: false, install: false) {
 	    	getConditionGroupPageContent(params, condition)
 	    }
     }

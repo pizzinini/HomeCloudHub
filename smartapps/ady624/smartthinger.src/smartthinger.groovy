@@ -13,6 +13,7 @@
  *  for the specific language governing permissions and limitations under the License.
  *
  *  Version history
+ *   4/29/2016 >>> v0.1.20160429 - Alpha test version - added condition naming
  *   4/29/2016 >>> v0.0.20160429 - Alpha test version
  *
  */
@@ -38,8 +39,142 @@ preferences {
     page(name: "pageConditionGroupL3")
 }
 
-def conditionId = 0
 
+def capabilities() {
+	return [
+    	[
+        	name: "contactSensor",
+        	display: "Contact Sensor",
+            attribute: "contact",
+            dataType: "string",
+            multiple: true,
+            values: [
+            	[ name: "is open", value: "open", momentary: false, singular: "is open", plural: "are all open" ],
+            	[ name: "is closed", value: "closed", momentary: false, singular: "is closed", plural: "are all open" ],
+            	[ name: "opens", value: "open", momentary: true, singular: "opens" ],
+            	[ name: "closes", value: "close", momentary: true, singular: "closes" ],
+            ]
+		],
+    	[
+        	name: "motionSensor",
+        	display: "Motion Sensor",
+            attribute: "motion",
+            dataType: "string",
+            multiple: true,
+            values: [
+            	[ name: "is active", value: "active", momentary: false, singular: "detects motion", plural: "all detect motion" ],
+            	[ name: "is inactive", value: "inactive", momentary: false, singular: "does not detect motion", plural: "do not detect motion" ],
+            	[ name: "becomes active", value: "active", momentary: true, singular: "opens" ],
+            	[ name: "becomes inactive", value: "inactive", momentary: true, singular: "closes" ],
+            ]
+		],
+    	[
+        	name: "switch",
+        	display: "Switch",
+            attribute: "switch",
+            dataType: "string",
+            multiple: true,
+            values: [
+            	[ name: "is on", value: "on", momentary: false, singular: "is ", plural: "are all [name]" ],
+            	[ name: "is off", value: "off", momentary: false, singular: "is [name]", plural: "are all [name]" ],
+            	[ name: "turns on", value: "on", momentary: true, singular: "opens" ],
+            	[ name: "turns off", value: "off", momentary: true, singular: "closes" ],                
+            ]
+		]
+    ]
+}
+
+def listCapabilities() {
+    def result = []
+    for (capability in capabilities()) {
+    	result.push(capability.display)
+    }
+    return result.sort()
+}
+
+def listCapabilityValues(capability, momentaryAllowed) {
+    def result = []
+    for (value in capability.values) {
+    	if (!value.momentary || momentaryAllowed) {
+	    	result.push(value.name)
+        }
+    }
+    return result.sort()
+}
+
+def getCapabilityByName(name) {
+    for (capability in capabilities()) {
+    	if (capability.name == name) {
+        	return capability
+        }
+    }
+    return null
+}
+
+def getCapabilityByDisplay(display) {
+    for (capability in capabilities()) {
+    	if (capability.display == display) {
+        	return capability
+        }
+    }
+    return null
+}
+
+def buildDeviceNameList(devices, suffix) {
+	def cnt = 1
+    def result = ""
+	for (device in devices) {
+        result += device?.label + (cnt < devices.size() ? (cnt == devices.size() - 1 ? " $suffix " : ", ") : "")
+        cnt++
+    }
+    return result;
+}
+
+def getConditionDescription(id) {
+	def condition = getCondition(id)
+    def pre = ""
+    def aft = ""
+    def tab = ""
+    def conditionGroup = (condition.children != null)
+    switch ((condition.level ? condition.level : 0) - (conditionGroup ? 0 : 1)) {
+        case 1:
+        pre = "(\n"
+        aft = ")"
+        tab = "\t"
+        break;
+        case 2:
+        pre = "\t[\n"
+        aft = "\t]"
+        tab = "\t\t"
+        break;
+        case 3:
+        pre = "\t\t{\n"
+        aft = "\t\t}"
+        tab = "\t\t\t"
+        break;
+    }
+    if (!conditionGroup) {
+    	//single condition
+        def devices = settings["condDevices$id"]
+        if (devices && devices.size()) {
+            def evalMode = settings["condMode$id"] == "All" ? "All" : "Any"
+            return tab + (devices.size() > 1 ? (evalMode == "All" ? "Each of " : "Any of ") : "") + buildDeviceNameList(devices, "or") + " " + settings["condValues$id"]
+        }
+        return "Sorry, incomplete rule"
+	} else {
+    	//condition group
+        def grouping = settings["condGrouping$id"]
+        def negate = settings["condNegate$id"]
+        def result = (negate ? "NOT " : "") + pre
+        def cnt = 1
+        for (child in condition.children) {
+        	result += getConditionDescription(child.id) + "\n" + (cnt < condition.children.size() ? tab + grouping + "\n" : "")
+            cnt++
+        }
+        result += aft
+        return result
+    }
+}
 
 def pageMain() {
 	configApp()
@@ -54,7 +189,7 @@ def pageMain() {
         }
         
         section() {
-			href "pageIf", title: "If...", description: "Choose your conditions", state: null
+			href "pageIf", title: "If...", description: getConditionDescription(0), state: null
 			href "pageThen", title: "Then...", description: "Choose what should happen then", state: null, submitOnChange: false
 			href "pageElse", title: "Else...", description: "Choose what should happen otherwise", state: null, submitOnChange: false
 
@@ -89,9 +224,9 @@ def getConditionGroupPageContent(params, condition) {
                 }
                 def cid = c?.id
                 if (c.children != null) {
-                    href "pageConditionGroupL${nextLevel}", params: ["conditionId": cid], title: "Condition Group $cid", description: "Edit condition group", state: "error", required: true, submitOnChange: false
+                    href "pageConditionGroupL${nextLevel}", params: ["conditionId": cid], title: "Condition Group $cid", description: getConditionDescription(cid), state: "complete", required: true, submitOnChange: false
                 } else {
-                    href "pageCondition", params: ["conditionId": cid], title: "Condition $cid", description: "Edit condition", state: "complete", required: true, submitOnChange: false
+                    href "pageCondition", params: ["conditionId": cid], title: "Condition $cid", description: getConditionDescription(cid), state: "complete", required: true, submitOnChange: false
                 }
                 cnt++
             }
@@ -130,8 +265,28 @@ def pageCondition(params) {
         def pid = condition.parentId
     	dynamicPage(name: "pageCondition", title: "Conditions", uninstall: false, install: false) {
 			section() {
-	            input "condType$id", "enum", title: "Condition $id capability", options: ["a", "b", "c", "d"], submitOnChange: true
+	            input "condCap$id", "enum", title: "Condition $id capability", options: listCapabilities(), submitOnChange: true
+                if (settings["condCap$id"]) {
+                	def capability = getCapabilityByDisplay(settings["condCap$id"])
+                    if (capability) {
+                		input "condDevices$id", "capability.${capability.name}", title: "Device list", required: true, multiple: capability.multiple, submitOnChange: true
+                        def devices = settings["condDevices$id"]
+                        log.trace "Device list is $devices"
+                        if (devices && devices.size()) {
+                        	if (devices.size() > 1) {
+                    			input "condMode$id", "enum", title: "Evaluation mode", options: ["Any", "All"], required: true, multiple: false, defaultValue: "All", submitOnChange: true
+                            }
+                            def evalMode = settings["condMode$id"] == "All" ? "All" : "Any"
+                            def title = (devices.size() > 1 ? (evalMode == "All" ? "Each of " : "Any of ") : "") + buildDeviceNameList(devices, "or") + "..."
+                            def momentary = (devices.size() == 1) || (evalMode == "Any")
+                    		input "condValues$id", "enum", title: title, options: listCapabilityValues(capability, momentary), required: true, multiple: false, submitOnChange: true
+                        }
+                    }
+                }
 			}
+            section(title: "Condition Overview") {
+                paragraph getConditionDescription(id)
+            }
             
             section(title: "Advanced options", hideable: true, hidden: true) {
                 input "condParent$id", "number", title: "Parent ID", range: "$pid..$pid", defaultValue: pid

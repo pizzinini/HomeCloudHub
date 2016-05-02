@@ -13,6 +13,7 @@
  *  for the specific language governing permissions and limitations under the License.
  *
  *  Version history
+ *   5/02/2016 >>> v0.0.003.20160501 - Alpha test version - added mode - simple, latching or else-if
  *   5/02/2016 >>> v0.0.002.20160501 - Alpha test version - added latching rules
  *   4/29/2016 >>> v0.0.001.20160429 - Alpha test version - added condition naming
  *   4/29/2016 >>> v0.0.000.20160429 - Alpha test version
@@ -32,7 +33,7 @@ definition(
 preferences {
 	page(name: "pageMain")
     page(name: "pageIf")
-    page(name: "pageIfLatching")
+    page(name: "pageIfOther")
     page(name: "pageThen")
     page(name: "pageElse")
     page(name: "pageCondition")
@@ -49,8 +50,15 @@ def pageMain() {
     	section() {
         	label title: "Name", required: true
         	input "description", "string", title: "Description", required: false, defaultValue: "test"
-            input "latching", "bool", title: "Latching SmartThinger", required: true, defaultValue: false, submitOnChange: true
-            paragraph "A latching SmartThinger - also known as a bi-stable SmartThinger - uses one set of conditions to achieve a 'true' state and a second set of conditions to revert back to its 'false' state"
+            input "mode", "enum", title: "SmartThinger Mode", required: true, options: ["Simple", "Latching", "Else-If"], defaultValue: "Simple", submitOnChange: true
+            switch (settings.mode) {
+            	case "Latching":
+            		paragraph "A latching SmartThinger - also known as a bi-stable SmartThinger - uses one set of conditions to achieve a 'true' state and a second set of conditions to revert back to its 'false' state"
+                    break
+            	case "Else-If":
+            		paragraph "An Else-If SmartThinger executes a set of actions if an initial condition set evaluates to true, otherwise executes a second set of actions if a second condition set evaluates to true"
+                    break
+            }
         }
         
         section() {
@@ -66,15 +74,22 @@ def pageMain() {
 			href "pageThen", title: "Then...", description: "Choose what should happen then", state: null, submitOnChange: false
         }
         
-        if (settings.latching) {
+        if (settings.mode == "Latching") {
             section() {
-                href "pageIfLatching", title: "But if...", description: (state.config.app.latchingConditions.children.size() ? "" : "Tap to select conditions")
-                buildIfLatchingContent()
+                href "pageIfOther", title: "But if...", description: (state.config.app.otherConditions.children.size() ? "" : "Tap to select conditions")
+                buildIfOtherContent()
             }
         }
-        
+
+        if (settings.mode == "Else-If") {
+            section() {
+                href "pageIfOther", title: "Else if...", description: (state.config.app.otherConditions.children.size() ? "" : "Tap to select conditions")
+                buildIfOtherContent()
+            }
+        }
+
         section() {
-			href "pageElse", title: (settings.latching ? "Then..." : "Else..."), description: "Choose what should happen otherwise", state: null, submitOnChange: false
+			href "pageElse", title: ((settings.mode == "Latching") || (settings.mode == "Else-If") ? "Then..." : "Else..."), description: "Choose what should happen otherwise", state: null, submitOnChange: false
 
 		}
     }
@@ -89,10 +104,10 @@ def pageIf(params) {
     }
 }
 
-def pageIfLatching(params) {
+def pageIfOther(params) {
     cleanUpConditions(false)
-	def condition = state.config.app.latchingConditions
-    dynamicPage(name: "pageIfLatching", title: "Main Condition Group", uninstall: false, install: false) {
+	def condition = state.config.app.otherConditions
+    dynamicPage(name: "pageIfOther", title: "Main Condition Group", uninstall: false, install: false) {
     	getConditionGroupPageContent(params, condition)
     }
 }
@@ -245,6 +260,7 @@ def pageConditionVsTrigger() {
 def configApp() {
 	//TODO: rebuild (object-oriented) app object from settings
 	//state.config = null
+    state.config.app.otherConditions = state.config.app.latchingConditions
 	if (!state.config) {
     	//initiate config app, since we have no running version yet (not yet installed)
         state.config = [:]
@@ -254,8 +270,8 @@ def configApp() {
         //create the root condition
     	state.config.app.conditions = createCondition(true)
         state.config.app.conditions.id = 0
-    	state.config.app.latchingConditions = createCondition(true)
-        state.config.app.latchingConditions.id = -1
+    	state.config.app.otherConditions = createCondition(true)
+        state.config.app.otherConditions.id = -1
     	state.config.app.actions = [:]
     	state.config.app.actions.whenTrue = []
     	state.config.app.actions.whileTrue = []
@@ -362,8 +378,8 @@ def buildIfContent() {
 	buildIfContent(state.config.app.conditions.id, 0)
 }
 
-def buildIfLatchingContent() {
-	buildIfContent(state.config.app.latchingConditions.id, 0)
+def buildIfOtherContent() {
+	buildIfContent(state.config.app.otherConditions.id, 0)
 }
 
 def buildIfContent(id, level) {
@@ -582,7 +598,7 @@ def _cleanUpCondition(condition, deleteGroups) {
 def cleanUpConditions(deleteGroups) {
 	//go through each condition in the state config and delete it if no associated settings exist
     _cleanUpCondition(state.config.app.conditions, deleteGroups)
-    _cleanUpCondition(state.config.app.latchingConditions, deleteGroups)
+    _cleanUpCondition(state.config.app.otherConditions, deleteGroups)
 }
 
 //finds and returns the condition object for the given condition Id
@@ -605,8 +621,8 @@ def getCondition(conditionId) {
     if (state.config.app.conditions) {
     	result =_traverseConditions(state.config.app.conditions, conditionId)
     }
-    if (!result && state.config.app.latchingConditions) {
-    	result = _traverseConditions(state.config.app.latchingConditions, conditionId)
+    if (!result && state.config.app.otherConditions) {
+    	result = _traverseConditions(state.config.app.otherConditions, conditionId)
     }
 	return result
 }

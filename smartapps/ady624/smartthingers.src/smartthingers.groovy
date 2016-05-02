@@ -260,7 +260,6 @@ def pageConditionVsTrigger() {
 def configApp() {
 	//TODO: rebuild (object-oriented) app object from settings
 	//state.config = null
-    state.config.app.otherConditions = state.config.app.latchingConditions
 	if (!state.config) {
     	//initiate config app, since we have no running version yet (not yet installed)
         state.config = [:]

@@ -120,6 +120,7 @@ def capabilities() {
 }
 
 def attributes() {
+	def tempUnit = "°" + location.temperatureScale
 	return [
     	[ name: "acceleration",				type: "enum",			range: null,			unit: null,		options: ["active", "inactive"],																			],
     	[ name: "alarm",					type: "enum",			range: null,			unit: null,		options: ["off", "strobe", "siren", "both"],																],
@@ -135,7 +136,7 @@ def attributes() {
     	[ name: "saturation",				type: "number",			range: "0..100",		unit: "%",		options: null,																								],
     	[ name: "level",					type: "number",			range: "0..100",		unit: "%",		options: null,																								],
     	[ name: "switch",					type: "enum",			range: null,			unit: null,		options: ["on", "off"],																						],
-    	[ name: "colorTemperature",			type: "number",			range: "2000..7000",	unit: "K",		options: null,																								],
+    	[ name: "colorTemperature",			type: "number",			range: "2000..7000",	unit: "°K",		options: null,																								],
     	[ name: "consumable",				type: "enum",			range: null,			unit: null,		options: ["missing", "good", "replace", "maintenance_required", "order"],									],
     	[ name: "contact",					type: "enum",			range: null,			unit: null,		options: ["open", "closed"],																				],
     	[ name: "door",						type: "enum",			range: null,			unit: null,		options: ["unknown", "closed", "open", "closing", "opening"],												],
@@ -162,13 +163,13 @@ def attributes() {
     	[ name: "goal",						type: "number",			range: "0..*",			unit: null,		options: null,																								],
     	[ name: "soundPressureLevel",		type: "number",			range: "0..*",			unit: null,		options: null,																								],
     	[ name: "tamper",					type: "enum",			range: null,			unit: null,		options: ["clear", "detected"],																				],
-    	[ name: "temperature",				type: "decimal",		range: "*..*",			unit: "F",		options: null,																								],
+    	[ name: "temperature",				type: "decimal",		range: "*..*",			unit: tempUnit,	options: null,																								],
     	[ name: "thermostatMode",			type: "enum",			range: null,			unit: null,		options: ["off", "auto", "cool", "heat", "emergency heat"],													],
     	[ name: "thermostatFanMode",		type: "enum",			range: null,			unit: null,		options: ["auto", "on", "circulate"],																		],
     	[ name: "thermostatOperatingState",	type: "enum",			range: null,			unit: null,		options: ["idle", "pending cool", "cooling", "pending heat", "heating", "fan only", "vent economizer"],		],
-        [ name: "coolingSetpoint",			type: "number",			range: "-127..127",		unit: "F",		options: null,																								],
-        [ name: "heatingSetpoint",			type: "number",			range: "-127..127",		unit: "F",		options: null,																								],
-        [ name: "thermostatSetpoint",		type: "number",			range: "-127..127",		unit: "F",		options: null,																								],
+        [ name: "coolingSetpoint",			type: "number",			range: "-127..127",		unit: tempUnit,	options: null,																								],
+        [ name: "heatingSetpoint",			type: "number",			range: "-127..127",		unit: tempUnit,	options: null,																								],
+        [ name: "thermostatSetpoint",		type: "number",			range: "-127..127",		unit: tempUnit,	options: null,																								],
         [ name: "sessionStatus",			type: "enum",			range: null,			unit: null,		options: ["paused", "stopped", "running", "canceled"],														],
     	[ name: "threeAxis",				type: "threeAxis",		range: "0..1024",		unit: null,		options: null,																								],
     	[ name: "touch",					type: "enum",			range: null,			unit: null,		options: ["touched"],																						],

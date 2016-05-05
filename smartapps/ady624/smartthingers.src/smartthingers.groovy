@@ -17,6 +17,7 @@
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  *  Version history
+ *   5/05/2016 >>> v0.0.006.20160505 - Alpha test version - Simple conditions implemented. All "is" type conditions should work
  *   5/04/2016 >>> v0.0.005.20160504 - Alpha test version - added full list of standard capabilities, attributes and commands, improved condition UI
  *   5/02/2016 >>> v0.0.004.20160502 - Alpha test version - changed license from Apache to GPLv3
  *   5/02/2016 >>> v0.0.003.20160502 - Alpha test version - added mode - simple, latching or else-if
@@ -180,9 +181,15 @@ def attributes() {
     ]
 }
 
+def timeOptions() {
+	def result = ["1 minute"]
+    for (def i =2; i <= 60; i++) {
+    	result.push("$i minutes")
+    }
+	return result
+}
+
 def triggerPrefix() {
-	//return "♦ "
-    //return "¤ "
     return "● "
 }
 
@@ -200,8 +207,8 @@ def pageMain() {
     cleanUpConditions(true)
 	dynamicPage(name: "pageMain", title: "SmartThinger Application", uninstall: true, install: true) {
     	section() {
-        	label title: "Name", required: true
-        	input "description", "string", title: "Description", required: false, defaultValue: "test"
+        	label title: "Name", required: true, state: null
+        	input "description", "string", title: "Description", required: false, state: null, defaultValue: "test"
             input "mode", "enum", title: "SmartThinger Mode", required: true, options: ["Simple", "Latching", "Else-If"], defaultValue: "Simple", submitOnChange: true
             switch (settings.mode) {
             	case "Latching":
@@ -247,6 +254,10 @@ def pageMain() {
 		section(title: "Advanced options", hideable: true, hidden: true) {
         	input "expert", "bool", title: "Expert Mode", defaultValue: false, submitOnChange: true
 		}
+        
+        section() {
+        	paragraph "Triggers in use: ${getTriggerCount(state.config.app)}"
+        }
 	}
 }
 
@@ -365,6 +376,7 @@ def pageCondition(params) {
 		condition = getCondition(params?.conditionId ? params?.conditionId : state.config.conditionId)
     }
     if (condition) {
+    	updateCondition(condition)
     	def id = condition.id
         state.config.conditionId = id
         def pid = condition.parentId
@@ -404,10 +416,29 @@ def pageCondition(params) {
                                     def comp = getComparisonOption(attribute, comparison)
                                     if (attr && comp) {
                                     	if (comp.parameters >= 1) {
-                                			input "condValue$id#1", title: (comp.parameters == 1 ? "Value" : "From"), attr.type, options: attr.options, range: attr.range, required: true, multiple: false, submitOnChange: true
+                                        	def value1 = settings["condValue$id#1"]
+                                            def device1 = settings["condDev$id#1"]
+                                            if (device1 == null) {
+                                				input "condValue$id#1", attr.type, title: (comp.parameters == 1 ? "Value" : "From value"), options: attr.options, range: attr.range, required: true, multiple: false, submitOnChange: true
+                                            }
+                                            if (value1 == null) {
+                                				input "condDev$id#1", "capability.${capability.name}", title: (device1 == null ? "... or choose a device to compare ..." : (comp.parameters == 1 ? "Device" : "From")), required: true, multiple: false, submitOnChange: true
+                                            }
                                         }
                                     	if (comp.parameters >= 2) {
-                                			input "condValue$id#2", title: "Through", attr.type, options: attr.options, range: attr.range, required: true, multiple: false, submitOnChange: true
+                                        	def value2 = settings["condValue$id#2"]
+                                            def device2 = settings["condDev$id#2"]
+                                            if (device2 == null) {
+                                				input "condValue$id#2", attr.type, title: "Through value", options: attr.options, range: attr.range, required: true, multiple: false, submitOnChange: true
+                                            }
+                                            if (value2 == null) {
+                                				input "condDev$id#2", "capability.${capability.name}", title: (device2 == null ? "... or choose a device to compare ..." : "Through"), required: true, multiple: false, submitOnChange: true
+                                            }
+                                        }
+                                        
+                                        if (comp.timed) {
+                                        	input "condFor$id", "enum", title: "Time restriction", options: ["for at least", "for less than"], required: true, multiple: false, submitOnChange: true
+                                        	input "condTime$id", "enum", title: "Interval", options: timeOptions(), required: true, multiple: false, submitOnChange: true
                                         }
                                     }
                                 }
@@ -491,67 +522,68 @@ def configApp() {
 
 
 def comparisons() {
+	def optionsEnum = [
+        [ condition: "is", trigger: "changes to", parameters: 1, timed: false],
+        [ condition: "is not", trigger: "changes away from", parameters: 1, timed: false],
+        [ condition: "was", trigger: "stays", parameters: 1, timed: true],
+        [ condition: "was not", parameters: 1, timed: true],
+        [ trigger: "changes", parameters: 0, timed: false],
+    ]
+    def optionsNumber = [
+        [ condition: "is equal to", trigger: "changes to", parameters: 1, timed: false],
+        [ condition: "is not equal to", trigger: "changes away from", parameters: 1, timed: false],
+        [ condition: "is less than", trigger: "drops below", parameters: 1, timed: false],
+        [ condition: "is less than or equal to", trigger: "drops to or below", parameters: 1, timed: false],
+        [ condition: "is greater than", trigger: "raises above", parameters: 1, timed: false],
+        [ condition: "is greater than or equal to", trigger: "raises to or above", parameters: 1, timed: false],
+        [ condition: "is in range", trigger: "enters range", parameters: 2, timed: false],
+        [ condition: "is outside of range", trigger: "exits range", parameters: 2, timed: false],
+        [ condition: "is even", trigger: "changes to an even value", parameters: 0, timed: false],
+        [ condition: "is odd", trigger: "changes to an odd value", parameters: 0, timed: false],
+        [ condition: "was equal to", trigger: "stays equal to", parameters: 1, timed: true],
+        [ condition: "was not equal to", trigger: "stays not equal to", parameters: 1, timed: true],
+        [ condition: "was less than", trigger: "stays less than", parameters: 1, timed: true],
+        [ condition: "was less than or equal to", trigger: "stays less than or equal to", parameters: 1, timed: true],
+        [ condition: "was greater than", trigger: "stays greater than", parameters: 1, timed: true],
+        [ condition: "was greater than or equal to", trigger: "stays greater than or equal to", parameters: 1, timed: true],
+        [ condition: "was in range",trigger: "stays in range",  parameters: 2, timed: true],
+        [ condition: "was outside range", trigger: "stays outside range", parameters: 2, timed: true],
+        [ condition: "was even", trigger: "stays even", parameters: 0, timed: true],
+        [ condition: "was odd", trigger: "stays odd", parameters: 0, timed: true],
+        [ trigger: "changes", parameters: 0, timed: false],
+    ]
+    def optionsTime = [
+        [ condition: "is", trigger: "reaches", parameters: 1],
+        [ condition: "is before", parameters: 1],
+        [ condition: "is after", parameters: 1],
+        [ condition: "is between", parameters: 2],
+	]
+    
 	return [
     	[
         	type: "string",
-            options: [
-            	[ condition: "is", trigger: "changes to", parameters: 1],
-            	[ condition: "is not", trigger: "changes away from", parameters: 1],
-            	[ trigger: "changes", parameters: 0],
-            ],
+            options: optionsEnum,
 		],
     	[
         	type: "enum",
-            options: [
-            	[ condition: "is", trigger: "changes to", parameters: 1],
-            	[ condition: "is not", trigger: "changes away from", parameters: 1],
-            	[ trigger: "changes", parameters: 0],
-            ],
+            options: optionsEnum,
 		],
     	[
         	type: "number",
-            options: [
-            	[ trigger: "changes", parameters: 0],
-            	[ condition: "is equal to", trigger: "changes to", parameters: 1],
-                [ condition: "is not equal to", trigger: "changes away from", parameters: 1],
-                [ condition: "is less than", trigger: "drops below", parameters: 1],
-                [ condition: "is less than or equal to", trigger: "drops to or below", parameters: 1],
-                [ condition: "is greater than", trigger: "raises above", parameters: 1],
-                [ condition: "is greater than or equal to", trigger: "raises to or above", parameters: 1],
-                [ condition: "is in range", trigger: "enters range", parameters: 2],
-                [ condition: "is outside range", trigger: "exits range", parameters: 2],
-                [ condition: "is even", trigger: "changes to an even value", parameters: 0],
-                [ condition: "is odd", trigger: "changes to an odd value", parameters: 0],
-			],
+            options: optionsNumber,
 		],
     	[
         	type: "decimal",
-            options: [
-            	[ trigger: "changes", parameters: 0],
-            	[ condition: "is equal to", trigger: "changes to", parameters: 1],
-                [ condition: "is not equal to", trigger: "changes away from", parameters: 1],
-                [ condition: "is less than", trigger: "drops below", parameters: 1],
-                [ condition: "is less than or equal to", trigger: "drops to or below", parameters: 1],
-                [ condition: "is greater than", trigger: "raises above", parameters: 1],
-                [ condition: "is greater than or equal to", trigger: "raises to or above", parameters: 1],
-                [ condition: "is in range", trigger: "enters range", parameters: 2],
-                [ condition: "is outside range", trigger: "exits range", parameters: 2],
-                [ condition: "is even", trigger: "changes to an even value", parameters: 0],
-                [ condition: "is odd", trigger: "changes to an odd value", parameters: 0],
-			],
+            options: optionsNumber
 		],
     	[
         	type: "time",
-            options: [
-            	[ condition: "is", trigger: "reaches", parameters: 1],
-                [ condition: "is before", parameters: 1],
-                [ condition: "is after", parameters: 1],
-                [ condition: "is between", parameters: 2],
-            ],
+            options: optionsTime,
 		],        
     ]
 }
 
+//returns a list of all available capabilities
 def listCapabilities(requireAttributes, requireCommands) {
     def result = []
     for (capability in capabilities()) {
@@ -562,7 +594,7 @@ def listCapabilities(requireAttributes, requireCommands) {
     return result
 }
 
-
+//returns a list of all available attributes
 def listAttributes() {
     def result = []
     for (attribute in attributes()) {
@@ -571,6 +603,7 @@ def listAttributes() {
     return result.sort()
 }
 
+//returns a list of possible comparison options for a selected attribute
 def listComparisonOptions(attributeName, allowTriggers) {
     def conditions = []
     def triggers = []
@@ -593,6 +626,7 @@ def listComparisonOptions(attributeName, allowTriggers) {
     return conditions.sort() + triggers.sort()
 }
 
+//returns the comparison option object for the given attribute and selected comparison
 def getComparisonOption(attributeName, comparisonOption) {
     def attribute = getAttributeByName(attributeName)
     if (attribute) {
@@ -613,6 +647,7 @@ def getComparisonOption(attributeName, comparisonOption) {
     return null	
 }
 
+//returns true if the comparisonOption selected for the given attribute is a trigger-type condition
 def isComparisonOptionTrigger(attributeName, comparisonOption) {
     def attribute = getAttributeByName(attributeName)
     if (attribute) {
@@ -633,44 +668,44 @@ def isComparisonOptionTrigger(attributeName, comparisonOption) {
     return null	
 }
 
-/*
-def listCapabilityValues(capability, triggerAllowed) {
-    def result = []
-    for (value in capability.values) {
-    	if (!value.trigger || triggerAllowed) {
-	    	result.push(value.name)
-        }
-    }
-    return result.sort()
-}
-*/
-
+//returns the list of attributes that exist for all devices in the provided list
 def listCommonDeviceAttributes(devices) {
 	def list = [:]
+    def customList = [:]
+    //build the list of standard attributes
 	for (attribute in attributes()) {
     	list[attribute.name] = 0
     }
-
+	//get supported attributes
     for (device in devices) {
     	def attrs = device.supportedAttributes
-        for (attr in attrs) {
-       		list[attr.name] = list.containsKey(attr.name) ? list[attr.name] + 1 : -100
+        for (attr in attrs) {        	
+        	if (list.containsKey(attr.name)) {
+            	//if attribute exists in standard list, increment its usage count
+	       		list[attr.name] = list[attr.name] + 1
+            } else {
+            	//otherwise increment the usage count in the custom list
+	       		customList[attr.name] = customList[attr.name] ? customList[attr.name] + 1 : 1
+            }
         }
     }
-    log.debug list
     def result = []
-    def custom = []
+    //get all common attributes from the standard list
     for (item in list) {
     	//ZWave Lock reports lock twice - others may do the same, so let's allow multiple instances
     	if (item.value >= devices.size()) {
         	result.push(item.key)
-        } else {
-        	if (item.value < 0) {
-            	custom.push(customAttributePrefix() + item.key)
-            }
         }
     }
-    return result.sort() + custom.sort()
+    //get all common attributes from the custom list
+    for (item in customList) {
+    	//ZWave Lock reports lock twice - others may do the same, so let's allow multiple instances
+    	if (item.value >= devices.size()) {
+        	result.push(customAttributePrefix() + item.key)
+        }
+    }
+    //return the sorted list
+    return result.sort()
 }
 
 def getCapabilityByName(name) {
@@ -699,22 +734,6 @@ def getAttributeByName(name) {
     }
     return [ name: name, type: "string", range: null, unit: null, options: null]
 }
-
-/*
-def getCapabilityValueByDisplayAndName(display, valueName) {
-    for (capability in capabilities()) {
-    	if (capability.display == display) {
-        	for (value in capability.values) {
-    			if (value.name == valueName) {
-                	return value
-    			}
-            }
-        }
-    }
-    return null
-}
-*/
-
 
 def buildDeviceNameList(devices, suffix) {
 	def cnt = 1
@@ -851,20 +870,28 @@ def getConditionDescription(id, level) {
             def comparison = cleanUpComparison(condition.comp)
             def comp = getComparisonOption(attribute, comparison)
             def values = " [ERROR]"
+            def time = ""
             if (comp) {
             	switch (comp.parameters) {
                 	case 0:
                     	values = ""
                         break
                     case 1:
-                    	values = " " + condition.val1 + unit
+                    	values = " " + (condition.dev1 ? condition.dev1 + "'s $attribute" : condition.val1 + unit)
                         break
                     case 2:
-                    	values = " " + condition.val1 + unit + " - " + condition.val2 + unit
+                    	values = " " + (condition.dev1 ? condition.dev1 + "'s $attribute" : condition.val1 + unit) + " - " + (condition.dev2 ? condition.dev2 + "'s $attribute" : condition.val2 + unit)
                         break                       
             	}
+                if (comp.timed) {
+                	if (condition.for && condition.time) {
+                		time = " " + condition.for + " " + condition.time
+                    } else {
+                    	time = " for [ERROR]"
+                    }
+                }
             }
-            return tab + (condition.trg ? triggerPrefix() : conditionPrefix()) + evaluation + deviceList + " " + attribute + " " + comparison + values
+            return tab + (condition.trg ? triggerPrefix() : conditionPrefix()) + evaluation + deviceList + " " + attribute + " " + comparison + values + time
         }
         return "Sorry, incomplete rule"
 	} else {
@@ -978,8 +1005,8 @@ def _cleanUpCondition(condition, deleteGroups) {
         	if (settings["condDevices${condition.id}"] == null) {
 	        	deleteCondition(condition.id);
 	            return true
-	        } else {
-            	_updateCondition(condition)
+	        //} else {
+            //	updateCondition(condition)
             }
         } else {
         	//if condition group
@@ -989,22 +1016,37 @@ def _cleanUpCondition(condition, deleteGroups) {
 	        }
         }
     }
+    updateCondition(condition)
     return result
 }
 
-def _updateCondition(condition) {
+def updateCondition(condition) {
 	condition.capability = settings["condCap${condition.id}"]
-	//condition.dev = settings["condDevices${condition.id}"]
+	condition.dev = []
+    for (device in settings["condDevices${condition.id}"])
+    {
+    	//save the list of device IDs - we can't have the actual device objects in the state
+    	condition.dev.push(device.id)
+    }
 	condition.mode = settings["condMode${condition.id}"]
     condition.attr = cleanUpAttribute(settings["condAttr${condition.id}"])
     if (!condition.attr) {
 	    def cap = getCapabilityByDisplay(condition.capability)
-    	condition.attr = cap.attribute
+        if (cap && cap.attribute) {
+    		condition.attr = cap.attribute
+        }
     }
     condition.comp = cleanUpComparison(settings["condComp${condition.id}"])
     condition.trg = isComparisonOptionTrigger(condition.attr, condition.comp)
     condition.val1 = settings["condValue${condition.id}#1"]
+    condition.dev1 = settings["condDev${condition.id}#1"] ? settings["condDev${condition.id}#1"].label : null
     condition.val2 = settings["condValue${condition.id}#2"]
+    condition.dev2 = settings["condDev${condition.id}#2"] ? settings["condDev${condition.id}#2"].label : null
+    condition.for = settings["condFor${condition.id}"]
+    condition.time = settings["condTime${condition.id}"]
+    condition.grp = settings["condGrouping${condition.id}"]
+    condition.grp = condition.grp && condition.grp.size() ? condition.grp : "AND"
+    condition.not = !!settings["condNegate${condition.id}"]
     return null
 }
 
@@ -1041,16 +1083,189 @@ def getCondition(conditionId) {
 	return result
 }
 
+//optimized version that returns true if any trigger is detected
+def getConditionHasTriggers(condition) {
+	def result = 0
+    if (condition) {
+        if (condition.children != null) {
+            //we're dealing with a group
+            for (child in condition.children) {
+                if (getConditionHasTriggers(child)) {
+                	//if we detect a trigger we exit immediately
+                	return true
+                }
+            }
+        } else {
+        	return !!condition.trg
+        }
+    }
+    return false
+}
+
+def getConditionTriggerCount(condition) {
+	def result = 0
+    if (condition) {
+        if (condition.children != null) {
+            //we're dealing with a group
+            for (child in condition.children) {
+                result += getConditionTriggerCount(child)
+            }
+        } else {
+        	if (condition.trg) {
+            	def devices = settings["condDevices${condition.id}"]
+                if (devices) {
+                	return devices.size()
+                } else {
+                	return 0
+                }
+            }
+        }
+    }
+    return result
+}
+
+def getTriggerCount(app) {
+	return getConditionTriggerCount(app.conditions) + (settings.mode == "Latching" ? getConditionTriggerCount(app.otherConditions) : 0)
+}
+
+def subscribeToDevices(condition, triggersOnly, handler, subscriptions, onlySubscriptions, excludeSubscriptions) {
+	if (subscriptions == null) {
+    	subscriptions = [:]
+    }
+	def result = 0
+    if (condition) {
+        if (condition.children != null) {
+            //we're dealing with a group
+            for (child in condition.children) {
+                subscribeToDevices(child, triggersOnly, handler, subscriptions, onlySubscriptions, excludeSubscriptions)
+            }
+        } else {
+        	if (condition.trg || !triggersOnly) {
+            	//get the details
+            	def devices = settings["condDevices${condition.id}"]
+                def attribute = cleanUpAttribute(settings["condAttr${condition.id}"])
+                if (devices) {
+                	for (device in devices) {
+                    	def subscription = "${device.id}-${attribute}"
+                        if ((excludeSubscriptions == null) || !(excludeSubscriptions[subscription])) {
+                        	//if we're provided with an exclusion list, we don't subscribe to those devices/attributes events
+                            if ((onlySubscriptions == null) || onlySubscriptions[subscription]) {
+                            	//if we're provided with a restriction list, we use it
+                                if (!subscriptions[subscription]) {
+                                    subscriptions[subscription] = true //[deviceId: device.id, attribute: attribute]
+                                    if (handler) {
+	                                    //we only subscribe to the device if we're provided a handler (not simulating)
+                                        log.trace "Subscribing to events from $device for attribute $attribute, handler is $handler"
+                                        subscribe(device, attribute, handler)
+                                    }
+                                }
+                            }
+						}
+                    }
+                } else {
+                	return
+                }
+            }
+        }
+    }
+    return subscriptions
+}
+
+def subscribeToAll(app) {
+	log.trace "Initializing subscriptions..."
+	//we have to maintain two separate logic threads for the latching mode
+    //to do so, we first simulate 
+	def hasTriggers = getConditionHasTriggers(app.conditions)
+   	def hasLatchingTriggers = false
+    
+   	if (settings.mode == "Latching") {
+    	//we really get the count
+    	hasLatchingTriggers = getConditionHasTriggers(app.otherConditions)
+		//simulate subscribing to both lists
+		def subscriptions = subscribeToDevices(app.conditions, hasTriggers, null, null, null, null)
+		def latchingSubscriptions = subscribeToDevices(app.otherConditions, hasLatchingTriggers, null, null, null, null)
+        //we now have the two lists that we'd be subscribing to, let's figure out the common elements
+        def commonSubscriptions = [:]
+        for (subscription in subscriptions) {
+        	if (latchingSubscriptions.containsKey(subscription.key)) {
+            	//found a common subscription, save it
+                commonSubscriptions[subscription.key] = true
+            }
+        }
+        //perform subscriptions
+		subscribeToDevices(app.conditions, false, bothDeviceHandler, null, commonSubscriptions, null)
+		subscribeToDevices(app.conditions, hasTriggers, deviceHandler, null, null, commonSubscriptions)
+		subscribeToDevices(app.otherConditions, hasLatchingTriggers, latchingDeviceHandler, null, null, commonSubscriptions)       
+    } else {
+    	//simple IF case, no worries here
+    	subscribeToDevices(app.conditions, hasTriggers, deviceHandler, null, null, null)
+    }
+	log.trace "Finished subscribing"
+}
+
+def checkEventEligibility(condition, evt) {
+	//we have a quad-state result
+    // -2 means we're using triggers and the event does not match any of the used triggers
+    // -1 means we're using conditions only and the event does not match any of the used conditions
+    // 1 means we're using conditions only and the event does match at least one of the used conditions
+    // 2 means we're using triggers and the event does match at least one of the used triggers
+    // any positive value means the event is eligible for evaluation
+	def result = -1 //assuming conditions only, no match
+    if (condition) {
+        if (condition.children != null) {
+            //we're dealing with a group
+            for (child in condition.children) {
+                def v = checkEventEligibility(child, evt)
+                switch (v) {
+                	case -2:
+                    	result = v
+                    	break
+                    case -1:
+                    	break
+                    case  1:
+                    	if (result == -1) {
+                        	result = v
+                        }
+                    	break
+                    case  2:
+	                	//if we already found a matching trigger, we're out
+    	            	return v
+                }
+            }
+        } else {
+        	if (condition.trg) {
+            	if (result < 2) {
+                	//if we haven't already found a trigger
+                	result = -2 // we are using triggers
+                }
+            }
+            for (deviceId in condition.dev) {
+                if ((evt.deviceId == deviceId) && (evt.name == condition.attr)) {
+                	if (condition.trg) {
+                    	//we found a trigger that matches the event, exit immediately
+                    	return 2
+                    } else {
+                    	if (result == -1) {
+                        	//we found a condition that matches the event, still looking for triggers though
+                        	result = 1
+                        }
+                    }
+                }
+            }
+        }
+    }
+    return result	
+}
 
 //blah blah functions that come with ST
 def installed() {
-	log.debug "Installed with settings: ${settings}"
+	//log.debug "Installed with settings: ${settings}"
 
 	initialize()
 }
 
 def updated() {
-	log.debug "Updated with settings: ${settings}"
+	//log.debug "Updated with settings: ${settings}"
 
 	unsubscribe()
 	initialize()
@@ -1058,9 +1273,317 @@ def updated() {
 
 def initialize() {
 	// TODO: subscribe to attributes, devices, locations, etc.
-    //subscribe(app, appHandler)
+    //move app to production
+    state.app = state.config.app
+    subscribeToAll(state.app)
+    state.cache = [:]
 }
 
-def appHandler() {
+def debug(message) {
+	debug message, null
 }
-// TODO: implement event handlers
+
+def debug(message, mode) {
+	if (!settings.debugging) {
+    	return
+    }
+    
+    //mode is
+    // 0 - initialize level, level set to 1
+    // 1 - start of routine, level up
+    // -1 - end of routine, level down
+    // anything else - nothing happens
+    
+    def level = state.debugLevel ? state.debugLevel : 0
+    def levelDelta = 0
+    def prefix = "║"
+    def pad = "░"
+    switch (mode) {
+    	case 0:
+        	level = 0
+            prefix = ""
+            break
+        case 1: 
+        	level += 1
+            prefix = "╚"
+            pad = "═"
+            break
+        case -1:
+        	levelDelta = -(level > 0 ? 1 : 0)
+            pad = "═"
+            prefix = "╔"
+        break
+    }
+    
+    if (level > 0) {
+    	prefix = prefix.padLeft(level, "║").padRight(8, pad)
+    }
+
+    level += levelDelta
+    state.debugLevel = level
+
+	log.debug "$prefix $message"
+}
+
+def deviceHandler(evt) {
+	//executes whenever a device in the primary if block has an event
+	//starting primary IF block evaluation
+    def perf = now()
+    debug "", 0
+	debug "Entering deviceHandler()", 1
+    broadcastDeviceEvent(evt, true, false)
+    perf = now() - perf
+    debug "Exiting deviceHandler() after ${perf}ms", -1
+}
+
+def latchingDeviceHandler(evt) {
+	//executes whenever a device in the primary if block has an event
+	//starting primary IF block evaluation
+    def perf = now()
+    debug "", 0
+	debug "Entering latchingDeviceHandler()", 1
+    broadcastDeviceEvent(evt, false, true)
+    perf = now() - perf
+    debug "Exiting latchingDeviceHandler() after ${perf}ms", -1
+}
+
+def bothDeviceHandler(evt) {
+	//executes whenever a common use device has an event
+	//broadcast to both IF blocks
+    def perf = now()
+    debug "", 0
+	debug "Entering bothDeviceHandler()", 1
+    broadcastDeviceEvent(evt, true, true)
+    perf = now() - perf
+    debug "Exiting bothDeviceHandler() after ${perf}ms", -1
+
+}
+
+def broadcastDeviceEvent(evt, primary, secondary) {
+	//filter duplicate events and broadcast event to proper IF blocks
+    def perf = now()
+	debug "Entering broadcastDeviceEvent()", 1
+	debug "Event was generated on ${evt.date} (${evt.date.getTime()}), about ${now() - evt.date.getTime()}ms ago"   
+    def cachedValue = atomicState.cache[evt.deviceId + '-' + evt.name]
+    def eventTime = evt.date.getTime()
+	state.cache[evt.deviceId + '-' + evt.name] = [ v: evt.value, t: eventTime ]
+    //we apparently can't change subelements of atomicState - we save the whole cache then?
+    atomicState.cache = state.cache
+	if (cachedValue) {
+    	if ((cachedValue.v == evt.value) && ((cachedValue.v instanceof String) || (eventTime < cachedValue.t) || (cachedValue.t + 1000 > eventTime))) {
+        	//duplicate event
+    		debug "WARNING: Received duplicate event for device ${evt.device}, attribute ${evt.name}='${evt.value}', ignoring..."
+            evt = null
+        }
+    }
+    if (evt) {    
+	    debug "Event is a valid, non-duplicate, storing it in the cache"
+    	//broadcast to primary IF block
+    	if (primary) evaluateConditionSet(evt, true)
+    	//broadcast to secondary IF block
+    	if (secondary) evaluateConditionSet(evt, false)
+	}
+    perf = now() - perf
+    debug "Exiting broadcastDeviceEvent() after ${perf}ms", -1
+}
+
+def evaluateConditionSet(evt, primary) {
+	//executes whenever a device in the primary or secondary if block has an event
+    def perf = now()
+	debug "Entering evaluateConditionSet()", 1
+    debug "Event received by the ${primary ? "primary" : "secondary"} IF block evaluation for device ${evt.device}, attribute ${evt.name}='${evt.value}', isStateChange=${evt.isStateChange()}, currentValue=${evt.device.currentValue(evt.name)}, determining eligibility"
+    //check for triggers - if the primary IF block has triggers and the event is not related to any trigger
+    //then we don't want to evaluate anything, as only triggers should be executed
+    //this check ensures that an event that is used in both blocks, but as different types, one as a trigger
+    //and one as a condition do not interfere with each other
+    def eligibilityStatus = checkEventEligibility(primary ? state.app.conditions: state.app.otherConditions , evt)
+    debug "Eligibility status is $eligibilityStatus (" + (eligibilityStatus == 2 ? "triggers required, event is a trigger" : (eligibilityStatus == 1 ? "triggers not required, event is a condition" : (eligibilityStatus == -2 ? "triggers required, but event is a condition" : "something is messed up"))) + ")"
+    if (eligibilityStatus > 0) {
+        debug "Event is eligible for evaluation, proceeding..."
+        def evaluation = evaluateCondition(primary ? state.app.conditions: state.app.otherConditions, evt)
+        log.info "THE ${primary ? "PRIMARY" : "SECONDARY"} EVALUATION OF\n${getConditionDescription(primary ? 0 : -1)}\n >>> $evaluation\n\n"
+    } else {
+        debug "Event is ineligible for evaluation, ignoring..."
+    }
+    perf = now() - perf
+    debug "Exiting evaluateConditionSet() after ${perf}ms", -1
+    
+    return evaluation
+}
+
+def evaluateCondition(condition, evt) {
+	//evaluates a condition
+    def perf = now()
+	debug "Entering evaluateCondition()", 1
+    
+    def result = false
+    
+    if (condition.children == null) {
+    	//we evaluate a real condition here
+    	debug "Evaluating condition #${condition.id}"
+        //several types of conditions, device, mode, SMH, time, etc.
+        if (condition.dev && condition.dev.size()) {
+        	result = evaluateDeviceCondition(condition, evt)
+        }
+    } else {
+    	debug "Evaluating group #${condition.id} with grouping function ${condition.grp}"
+    	//we evaluate a group
+        result = (condition.grp == "AND") //we need to start with a true when doing AND or with a false when doing OR/XOR
+        for (child in condition.children) {
+        	//evaluate the child
+           	def subResult = evaluateCondition(child, evt)
+            //apply it to the composite result
+        	switch (condition.grp) {
+            	case "AND":
+                	result = result && subResult
+                    break
+            	case "OR":
+                	result = result || subResult
+                    break
+            	case "XOR":
+                	result = result ^ subResult
+                    break
+            }
+        }
+    }
+    
+    perf = now() - perf
+    debug "Exiting evaluateCondition() after ${perf}ms", -1
+
+	return result
+}
+
+def evaluateDeviceCondition(condition, evt) {
+	//evaluates a condition
+    def perf = now()
+	debug "Entering evaluateDeviceCondition()", 1
+    
+    //we need true when dealing with All
+    def mode = condition.mode == "All" ? "All" : "Any"
+    def result =  mode == "All" ? true : false
+    
+    //get list of devices
+    def devices = settings["condDevices${condition.id}"]
+    if (!devices) {
+    	//something went wrong
+        debug "Something went wrong, we cannot find any devices for condition #${condition.id}"
+    	
+    } else {
+    	//the real deal goes here
+        
+        for (device in devices) {
+			def comp = getComparisonOption(condition.attr, condition.comp)
+            if (comp) {
+            	//if event is about the same device/attribute, use the event's value as the current value, otherwise, fetch the current value from the device
+                def deviceResult = false
+                def ownsEvent = (evt.deviceId == device.id) && (evt.name == condition.attr)
+            	def currentValue = ownsEvent ? evt.value : device.currentValue(condition.attr)
+                def value1 = condition.dev1 && settings["condDev${condition.id}#1"] ? settings["condDev${condition.id}#1"].currentValue(condition.attr) : condition.val1
+                def value2 = condition.dev2 && settings["condDev${condition.id}#2"] ? settings["condDev${condition.id}#2"].currentValue(condition.attr) : condition.val2
+                if (condition.trg && !ownsEvent) {
+                	//all triggers should be false unless they're the owning the event
+                } else {
+                	def function = "eval_" + (condition.trg ? "trg" : "cond") + "_" + condition.comp.replace(" ", "_")
+					deviceResult = "$function"(condition, device, condition.attr, currentValue, value1, value2, ownsEvent ? evt : null, evt)
+                    //log.trace "Function $function $currentValue / $value1 / $value2 returned $deviceResult"
+                }
+                
+        		//compound the result, depending on mode
+        		switch (mode) {
+	            	case "All":
+	                	result = result && deviceResult
+	                	break
+	                case "Any":
+	                	result = result || deviceResult
+	                	break
+	            }
+            }
+        }
+        
+    }
+    perf = now() - perf
+    debug "Exiting evaluateDeviceCondition() after ${perf}ms", -1
+	
+    return condition.not ? !result : result
+}
+
+
+
+
+/* low-level evaluation functions */
+def eval_cond_is(condition, device, attribute, currentValue, value1, value2, evt, sourceEvt) {
+	return currentValue == value1
+}
+
+def eval_cond_is_equal_to(condition, device, attribute, currentValue, value1, value2, evt, sourceEvt) {
+	return currentValue == value1
+}
+
+def eval_cond_is_not(condition, device, attribute, currentValue, value1, value2, evt, sourceEvt) {
+	return currentValue != value1
+}
+
+def eval_cond_is_not_equal_to(condition, device, attribute, currentValue, value1, value2, evt, sourceEvt) {
+	return currentValue != value1
+}
+
+def eval_cond_is_less_than(condition, device, attribute, currentValue, value1, value2, evt, sourceEvt) {
+	return currentValue < value1
+}
+
+def eval_cond_is_less_than_or_equal_to(condition, device, attribute, currentValue, value1, value2, evt, sourceEvt) {
+	return currentValue <= value1
+}
+
+def eval_cond_is_greater_than(condition, device, attribute, currentValue, value1, value2, evt, sourceEvt) {
+	return currentValue > value1
+}
+
+def eval_cond_is_greater_than_or_equal_to(condition, device, attribute, currentValue, value1, value2, evt, sourceEvt) {
+	return currentValue >= value1
+}
+
+def eval_cond_is_even(condition, device, attribute, currentValue, value1, value2, evt, sourceEvt) {
+	if (currentValue.isInteger()) {
+    	return currentValue.toInteger().mod(2) == 0
+    }
+	return false
+}
+
+def eval_cond_is_odd(condition, device, attribute, currentValue, value1, value2, evt, sourceEvt) {
+	if (currentValue.isInteger()) {
+    	return currentValue.toInteger().mod(2) == 0
+    }
+	return false
+}
+
+def eval_cond_is_in_range(condition, device, attribute, currentValue, value1, value2, evt, sourceEvt) {
+	if (value1 < value2) {
+		return (currentValue >= value1) && (currentValue <= value2)
+    } else {
+		return (currentValue >= value2) && (currentValue <= value1)
+    }
+}
+
+def eval_cond_is_outside_of_range(condition, device, attribute, currentValue, value1, value2, evt, sourceEvt) {
+	if (value1 < value2) {
+		return (currentValue < value1) || (currentValue > value2)
+	} else {
+		return (currentValue < value2) || (currentValue > value1)
+    }
+}
+
+def eval_cond_was_greater_than_or_equal_to(condition, device, attribute, currentValue, value1, value2, evt, sourceEvt) {
+	return true
+}
+
+def dummy() {
+	//evaluates a condition
+    def perf = now()
+	debug "Entering dummy()", 1
+    
+    
+    perf = now() - perf
+    debug "Exiting dummy() after ${perf}ms", -1
+	
+}

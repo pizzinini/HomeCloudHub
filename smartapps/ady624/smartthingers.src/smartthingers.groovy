@@ -1263,7 +1263,7 @@ def subscribeToDevices(condition, triggersOnly, handler, subscriptions, onlySubs
         	if (condition.trg || !triggersOnly) {
             	//get the details
                 def capability = getCapabilityByDisplay(condition.cap)
-            	def devices = capability.virtualDevice ? [capability.virtualDevice] : settings["condDevices${condition.id}"]
+            	def devices = capability.virtualDevice ? (capability.attribute == "time" ? [] : [capability.virtualDevice]) : settings["condDevices${condition.id}"]
                 def attribute = capability.virtualDevice ? capability.attribute : cleanUpAttribute(settings["condAttr${condition.id}"])
                 if (devices) {
                 	for (device in devices) {

@@ -17,6 +17,7 @@
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  *  Version history
+ *   5/05/2016 >>> v0.0.007.20160505 - Alpha test version - All conditions implemented, simple triggers implemented. History-based triggers ("...stays...") not working yet
  *   5/05/2016 >>> v0.0.006.20160505 - Alpha test version - Simple conditions implemented. All "is" type conditions should work
  *   5/04/2016 >>> v0.0.005.20160504 - Alpha test version - added full list of standard capabilities, attributes and commands, improved condition UI
  *   5/02/2016 >>> v0.0.004.20160502 - Alpha test version - changed license from Apache to GPLv3
@@ -181,12 +182,67 @@ def attributes() {
     ]
 }
 
+def comparisons() {
+	def optionsEnum = [
+        [ condition: "is", trigger: "changes to", parameters: 1, timed: false],
+        [ condition: "is not", trigger: "changes away from", parameters: 1, timed: false],
+        [ condition: "was", trigger: "stays", parameters: 1, timed: true],
+        [ condition: "was not", parameters: 1, timed: true],
+        [ trigger: "changes", parameters: 0, timed: false],
+    ]
+    def optionsNumber = [
+        [ condition: "is equal to", trigger: "changes to", parameters: 1, timed: false],
+        [ condition: "is not equal to", trigger: "changes away from", parameters: 1, timed: false],
+        [ condition: "is less than", trigger: "drops below", parameters: 1, timed: false],
+        [ condition: "is less than or equal to", trigger: "drops to or below", parameters: 1, timed: false],
+        [ condition: "is greater than", trigger: "raises above", parameters: 1, timed: false],
+        [ condition: "is greater than or equal to", trigger: "raises to or above", parameters: 1, timed: false],
+        [ condition: "is in range", trigger: "enters range", parameters: 2, timed: false],
+        [ condition: "is outside of range", trigger: "exits range", parameters: 2, timed: false],
+        [ condition: "is even", trigger: "changes to an even value", parameters: 0, timed: false],
+        [ condition: "is odd", trigger: "changes to an odd value", parameters: 0, timed: false],
+        [ condition: "was equal to", trigger: "stays equal to", parameters: 1, timed: true],
+        [ condition: "was not equal to", trigger: "stays not equal to", parameters: 1, timed: true],
+        [ condition: "was less than", trigger: "stays less than", parameters: 1, timed: true],
+        [ condition: "was less than or equal to", trigger: "stays less than or equal to", parameters: 1, timed: true],
+        [ condition: "was greater than", trigger: "stays greater than", parameters: 1, timed: true],
+        [ condition: "was greater than or equal to", trigger: "stays greater than or equal to", parameters: 1, timed: true],
+        [ condition: "was in range",trigger: "stays in range",  parameters: 2, timed: true],
+        [ condition: "was outside range", trigger: "stays outside range", parameters: 2, timed: true],
+        [ condition: "was even", trigger: "stays even", parameters: 0, timed: true],
+        [ condition: "was odd", trigger: "stays odd", parameters: 0, timed: true],
+        [ trigger: "changes", parameters: 0, timed: false],
+    ]
+    def optionsTime = [
+        [ condition: "is", trigger: "reaches", parameters: 1],
+        [ condition: "is before", parameters: 1],
+        [ condition: "is after", parameters: 1],
+        [ condition: "is between", parameters: 2],
+	]
+	return [
+    	[ type: "string",		options: optionsEnum,	],
+    	[ type: "enum",			options: optionsEnum,	],
+    	[ type: "number",		options: optionsNumber,	],
+    	[ type: "decimal",		options: optionsNumber	],
+    	[ type: "time",			options: optionsTime,	],        
+    ]
+}
+
+
 def timeOptions() {
 	def result = ["1 minute"]
     for (def i =2; i <= 60; i++) {
     	result.push("$i minutes")
     }
 	return result
+}
+
+def timeToMinutes(time) {
+	def value = time.replace(" minutes", "").replace(" minute", "")
+    if (value.isInteger()) {
+    	return value.toInteger()
+    }
+    return 0
 }
 
 def triggerPrefix() {
@@ -510,77 +566,11 @@ def configApp() {
     	state.config.app.otherConditions = createCondition(true)
         state.config.app.otherConditions.id = -1
     	state.config.app.actions = [:]
-    	state.config.app.actions.whenTrue = []
-    	state.config.app.actions.whileTrue = []
-    	state.config.app.actions.whenFalse = []
-    	state.config.app.actions.whileFalse = []
+    	state.config.app.actions.ot = []
+    	state.config.app.actions.wt = []
+    	state.config.app.actions.of = []
+    	state.config.app.actions.wf = []
     }
-}
-
-
-
-
-
-def comparisons() {
-	def optionsEnum = [
-        [ condition: "is", trigger: "changes to", parameters: 1, timed: false],
-        [ condition: "is not", trigger: "changes away from", parameters: 1, timed: false],
-        [ condition: "was", trigger: "stays", parameters: 1, timed: true],
-        [ condition: "was not", parameters: 1, timed: true],
-        [ trigger: "changes", parameters: 0, timed: false],
-    ]
-    def optionsNumber = [
-        [ condition: "is equal to", trigger: "changes to", parameters: 1, timed: false],
-        [ condition: "is not equal to", trigger: "changes away from", parameters: 1, timed: false],
-        [ condition: "is less than", trigger: "drops below", parameters: 1, timed: false],
-        [ condition: "is less than or equal to", trigger: "drops to or below", parameters: 1, timed: false],
-        [ condition: "is greater than", trigger: "raises above", parameters: 1, timed: false],
-        [ condition: "is greater than or equal to", trigger: "raises to or above", parameters: 1, timed: false],
-        [ condition: "is in range", trigger: "enters range", parameters: 2, timed: false],
-        [ condition: "is outside of range", trigger: "exits range", parameters: 2, timed: false],
-        [ condition: "is even", trigger: "changes to an even value", parameters: 0, timed: false],
-        [ condition: "is odd", trigger: "changes to an odd value", parameters: 0, timed: false],
-        [ condition: "was equal to", trigger: "stays equal to", parameters: 1, timed: true],
-        [ condition: "was not equal to", trigger: "stays not equal to", parameters: 1, timed: true],
-        [ condition: "was less than", trigger: "stays less than", parameters: 1, timed: true],
-        [ condition: "was less than or equal to", trigger: "stays less than or equal to", parameters: 1, timed: true],
-        [ condition: "was greater than", trigger: "stays greater than", parameters: 1, timed: true],
-        [ condition: "was greater than or equal to", trigger: "stays greater than or equal to", parameters: 1, timed: true],
-        [ condition: "was in range",trigger: "stays in range",  parameters: 2, timed: true],
-        [ condition: "was outside range", trigger: "stays outside range", parameters: 2, timed: true],
-        [ condition: "was even", trigger: "stays even", parameters: 0, timed: true],
-        [ condition: "was odd", trigger: "stays odd", parameters: 0, timed: true],
-        [ trigger: "changes", parameters: 0, timed: false],
-    ]
-    def optionsTime = [
-        [ condition: "is", trigger: "reaches", parameters: 1],
-        [ condition: "is before", parameters: 1],
-        [ condition: "is after", parameters: 1],
-        [ condition: "is between", parameters: 2],
-	]
-    
-	return [
-    	[
-        	type: "string",
-            options: optionsEnum,
-		],
-    	[
-        	type: "enum",
-            options: optionsEnum,
-		],
-    	[
-        	type: "number",
-            options: optionsNumber,
-		],
-    	[
-        	type: "decimal",
-            options: optionsNumber
-		],
-    	[
-        	type: "time",
-            options: optionsTime,
-		],        
-    ]
 }
 
 //returns a list of all available capabilities
@@ -1157,6 +1147,9 @@ def subscribeToDevices(condition, triggersOnly, handler, subscriptions, onlySubs
 	                                    //we only subscribe to the device if we're provided a handler (not simulating)
                                         log.trace "Subscribing to events from $device for attribute $attribute, handler is $handler"
                                         subscribe(device, attribute, handler)
+                                        //initialize the cache for the device - this will allow the triggers to work properly on first firing
+                                        state.cache[device.id + "-" + attribute] = [v: device.currentValue(attribute), t: now()]
+                                        
                                     }
                                 }
                             }
@@ -1275,8 +1268,8 @@ def initialize() {
 	// TODO: subscribe to attributes, devices, locations, etc.
     //move app to production
     state.app = state.config.app
-    subscribeToAll(state.app)
     state.cache = [:]
+    subscribeToAll(state.app)
 }
 
 def debug(message) {
@@ -1366,7 +1359,7 @@ def broadcastDeviceEvent(evt, primary, secondary) {
 	debug "Event was generated on ${evt.date} (${evt.date.getTime()}), about ${now() - evt.date.getTime()}ms ago"   
     def cachedValue = atomicState.cache[evt.deviceId + '-' + evt.name]
     def eventTime = evt.date.getTime()
-	state.cache[evt.deviceId + '-' + evt.name] = [ v: evt.value, t: eventTime ]
+	state.cache[evt.deviceId + '-' + evt.name] = [o: cachedValue ? cachedValue.v : null, v: evt.value, t: eventTime ]
     //we apparently can't change subelements of atomicState - we save the whole cache then?
     atomicState.cache = state.cache
 	if (cachedValue) {
@@ -1385,6 +1378,7 @@ def broadcastDeviceEvent(evt, primary, secondary) {
 	}
     perf = now() - perf
     debug "Exiting broadcastDeviceEvent() after ${perf}ms", -1
+    if (evt) log.trace "Event processing took ${perf}ms"
 }
 
 def evaluateConditionSet(evt, primary) {
@@ -1401,7 +1395,7 @@ def evaluateConditionSet(evt, primary) {
     if (eligibilityStatus > 0) {
         debug "Event is eligible for evaluation, proceeding..."
         def evaluation = evaluateCondition(primary ? state.app.conditions: state.app.otherConditions, evt)
-        log.info "THE ${primary ? "PRIMARY" : "SECONDARY"} EVALUATION OF\n${getConditionDescription(primary ? 0 : -1)}\n >>> $evaluation\n\n"
+        log.info "${primary ? "PRIMARY" : "SECONDARY"} EVALUATION IS $evaluation\n${getConditionDescription(primary ? 0 : -1)}\n"
     } else {
         debug "Event is ineligible for evaluation, ignoring..."
     }
@@ -1472,20 +1466,51 @@ def evaluateDeviceCondition(condition, evt) {
     	//the real deal goes here
         
         for (device in devices) {
+
+			//update cache for device
+//            def key = device.id + '-' + condition.attr
+//            def cachedValue = state.cache[key]
+//            if (cachedValue && cachedValue.o == null) {
+//				state.cache[key] = [o: cachedValue.v, t: now(), v: device.currentValue(condition.attr)]
+//            }
+
 			def comp = getComparisonOption(condition.attr, condition.comp)
             if (comp) {
             	//if event is about the same device/attribute, use the event's value as the current value, otherwise, fetch the current value from the device
                 def deviceResult = false
                 def ownsEvent = (evt.deviceId == device.id) && (evt.name == condition.attr)
+                def oldValue = null
+                if (condition.trg) {
+                	def cachedValue = state.cache[device.id + "-" + condition.attr]
+                    if (cachedValue) oldValue = cachedValue.o
+                }
             	def currentValue = ownsEvent ? evt.value : device.currentValue(condition.attr)
                 def value1 = condition.dev1 && settings["condDev${condition.id}#1"] ? settings["condDev${condition.id}#1"].currentValue(condition.attr) : condition.val1
                 def value2 = condition.dev2 && settings["condDev${condition.id}#2"] ? settings["condDev${condition.id}#2"].currentValue(condition.attr) : condition.val2
+                //casting
+				def attr = getAttributeByName(condition.attr)
+                if (attr) {
+                	switch (attr.type) {
+                    	case "number":
+                        	if (oldValue instanceof String) oldValue = oldValue.isInteger() ? oldValue.toInteger() : 0
+                        	if (currentValue instanceof String) currentValue = currentValue.isInteger() ? currentValue.toInteger() : 0
+							if (value1 instanceof String) value1 = value1.isInteger() ? value1.toInteger() : 0
+							if (value2 instanceof String) value2 = value2.isInteger() ? value2.toInteger() : 0
+                        case "decimal":
+                        	if (oldValue instanceof String) oldValue = oldValue.isFloat() ? oldValue.isFloat() : 0
+							if (currentValue instanceof String) currentValue = currentValue.isFloat() ? currentValue.toFloat() : 0
+							if (value1 instanceof String) value1 = value1.isFloat() ? value1.toFloat() : 0
+							if (value2 instanceof String) value2 = value2.isFloat() ? value1.toFloat() : 0
+                        	break
+                    }
+                }
                 if (condition.trg && !ownsEvent) {
-                	//all triggers should be false unless they're the owning the event
-                } else {
+                    //all triggers should own the event, otherwise be false
+                    deviceResult = false
+                } else {          
                 	def function = "eval_" + (condition.trg ? "trg" : "cond") + "_" + condition.comp.replace(" ", "_")
-					deviceResult = "$function"(condition, device, condition.attr, currentValue, value1, value2, ownsEvent ? evt : null, evt)
-                    //log.trace "Function $function $currentValue / $value1 / $value2 returned $deviceResult"
+					deviceResult = "$function"(condition, device, condition.attr, oldValue, currentValue, value1, value2, ownsEvent ? evt : null, evt)
+                    log.info "Function $function for $device [$oldValue >>> $currentValue] ${condition.comp} $value1 - $value2 returned $deviceResult"
                 }
                 
         		//compound the result, depending on mode
@@ -1511,53 +1536,53 @@ def evaluateDeviceCondition(condition, evt) {
 
 
 /* low-level evaluation functions */
-def eval_cond_is(condition, device, attribute, currentValue, value1, value2, evt, sourceEvt) {
+def eval_cond_is(condition, device, attribute, oldValue, currentValue, value1, value2, evt, sourceEvt) {
+	return eval_cond_is_equal_to(condition, device, attribute, oldValue, currentValue, value1, value2, evt, sourceEvt)
+}
+
+def eval_cond_is_not(condition, device, attribute, oldValue, currentValue, value1, value2, evt, sourceEvt) {
+	return eval_cond_is_not_equal_to(condition, device, attribute, oldValue, currentValue, value1, value2, evt, sourceEvt)
+}
+
+def eval_cond_is_equal_to(condition, device, attribute, oldValue, currentValue, value1, value2, evt, sourceEvt) {
 	return currentValue == value1
 }
 
-def eval_cond_is_equal_to(condition, device, attribute, currentValue, value1, value2, evt, sourceEvt) {
-	return currentValue == value1
-}
-
-def eval_cond_is_not(condition, device, attribute, currentValue, value1, value2, evt, sourceEvt) {
+def eval_cond_is_not_equal_to(condition, device, attribute, oldValue, currentValue, value1, value2, evt, sourceEvt) {
 	return currentValue != value1
 }
 
-def eval_cond_is_not_equal_to(condition, device, attribute, currentValue, value1, value2, evt, sourceEvt) {
-	return currentValue != value1
-}
-
-def eval_cond_is_less_than(condition, device, attribute, currentValue, value1, value2, evt, sourceEvt) {
+def eval_cond_is_less_than(condition, device, attribute, oldValue, currentValue, value1, value2, evt, sourceEvt) {
 	return currentValue < value1
 }
 
-def eval_cond_is_less_than_or_equal_to(condition, device, attribute, currentValue, value1, value2, evt, sourceEvt) {
+def eval_cond_is_less_than_or_equal_to(condition, device, attribute, oldValue, currentValue, value1, value2, evt, sourceEvt) {
 	return currentValue <= value1
 }
 
-def eval_cond_is_greater_than(condition, device, attribute, currentValue, value1, value2, evt, sourceEvt) {
+def eval_cond_is_greater_than(condition, device, attribute, oldValue, currentValue, value1, value2, evt, sourceEvt) {
 	return currentValue > value1
 }
 
-def eval_cond_is_greater_than_or_equal_to(condition, device, attribute, currentValue, value1, value2, evt, sourceEvt) {
+def eval_cond_is_greater_than_or_equal_to(condition, device, attribute, oldValue, currentValue, value1, value2, evt, sourceEvt) {
 	return currentValue >= value1
 }
 
-def eval_cond_is_even(condition, device, attribute, currentValue, value1, value2, evt, sourceEvt) {
+def eval_cond_is_even(condition, device, attribute, oldValue, currentValue, value1, value2, evt, sourceEvt) {
 	if (currentValue.isInteger()) {
     	return currentValue.toInteger().mod(2) == 0
     }
 	return false
 }
 
-def eval_cond_is_odd(condition, device, attribute, currentValue, value1, value2, evt, sourceEvt) {
+def eval_cond_is_odd(condition, device, attribute, oldValue, currentValue, value1, value2, evt, sourceEvt) {
 	if (currentValue.isInteger()) {
     	return currentValue.toInteger().mod(2) == 0
     }
 	return false
 }
 
-def eval_cond_is_in_range(condition, device, attribute, currentValue, value1, value2, evt, sourceEvt) {
+def eval_cond_is_in_range(condition, device, attribute, oldValue, currentValue, value1, value2, evt, sourceEvt) {
 	if (value1 < value2) {
 		return (currentValue >= value1) && (currentValue <= value2)
     } else {
@@ -1565,7 +1590,7 @@ def eval_cond_is_in_range(condition, device, attribute, currentValue, value1, va
     }
 }
 
-def eval_cond_is_outside_of_range(condition, device, attribute, currentValue, value1, value2, evt, sourceEvt) {
+def eval_cond_is_outside_of_range(condition, device, attribute, oldValue, currentValue, value1, value2, evt, sourceEvt) {
 	if (value1 < value2) {
 		return (currentValue < value1) || (currentValue > value2)
 	} else {
@@ -1573,9 +1598,258 @@ def eval_cond_is_outside_of_range(condition, device, attribute, currentValue, va
     }
 }
 
-def eval_cond_was_greater_than_or_equal_to(condition, device, attribute, currentValue, value1, value2, evt, sourceEvt) {
-	return true
+def listPreviousStates(device, attribute, currentValue, minutes, excludeLast) {
+//	def events = device.eventsSince(new Date(now() - minutes * 60000));
+	def events = device.events([all: true, max: 100]).findAll{it.name == attribute}
+    def result = []
+    //if we got any events, let's go through them       
+	//if we need to exclude last event, we start at the second event, as the first one is the event that triggered this function. The attribute's value has to be different from the current one to qualify for quiet
+    def value = currentValue
+    def thresholdTime = now() - minutes * 60000
+    def endTime = now()
+    for(def i = 0; i < events.size(); i++) {
+    	def startTime = events[i].date.getTime()
+    	def duration = endTime - startTime
+        if ((duration >= 1000) && ((i > 0) || !excludeLast)) {
+	        result.push([value: events[i].value, startTime: startTime, duration: duration])
+        }
+        if (startTime < thresholdTime)
+	        break
+        endTime = startTime
+    }
+    return result
 }
+
+
+def eval_cond_was(condition, device, attribute, oldValue, currentValue, value1, value2, evt, sourceEvt) {
+	return eval_cond_was_equal_to(condition, device, attribute, oldValue, currentValue, value1, value2, evt, sourceEvt)
+}
+
+def eval_cond_was_not(condition, device, attribute, oldValue, currentValue, value1, value2, evt, sourceEvt) {
+	eval_cond_was_not_equal_to(condition, device, attribute, oldValue, currentValue, value1, value2, evt, sourceEvt)
+}
+
+def eval_cond_was_equal_to(condition, device, attribute, oldValue, currentValue, value1, value2, evt, sourceEvt) {
+    def time = timeToMinutes(condition.time)
+	def states = listPreviousStates(device, attribute, currentValue, time, evt ? 1 : 0)
+    def thresholdTime = time * 60000
+    def stableTime = 0
+    for (state in states) {
+    	if (state.value == value1) {
+        	stableTime += state.duration
+        } else {
+        	break
+        }
+    }
+    return (stableTime > 0) && (condition.for == "for at least" ? stableTime >= thresholdTime : stableTime < thresholdTime)
+}
+
+def eval_cond_was_not_equal_to(condition, device, attribute, oldValue, currentValue, value1, value2, evt, sourceEvt) {
+    def time = timeToMinutes(condition.time)
+	def states = listPreviousStates(device, attribute, currentValue, time, evt ? 1 : 0)
+    def thresholdTime = time * 60000
+    def stableTime = 0
+    for (state in states) {
+    	if (state.value != value1) {
+        	stableTime += state.duration
+        } else {
+        	break
+        }
+    }
+    return (stableTime > 0) && (condition.for == "for at least" ? stableTime >= thresholdTime : stableTime < thresholdTime)
+}
+
+def eval_cond_was_less_than(condition, device, attribute, oldValue, currentValue, value1, value2, evt, sourceEvt) {
+    def time = timeToMinutes(condition.time)
+	def states = listPreviousStates(device, attribute, currentValue, time, evt ? 1 : 0)
+    def thresholdTime = time * 60000
+    def stableTime = 0
+    for (state in states) {
+    	if (state.value < value1) {
+        	stableTime += state.duration
+        } else {
+        	break
+        }
+    }
+    return (stableTime > 0) && (condition.for == "for at least" ? stableTime >= thresholdTime : stableTime < thresholdTime)
+}
+
+def eval_cond_was_less_than_or_equal_to(condition, device, attribute, oldValue, currentValue, value1, value2, evt, sourceEvt) {
+    def time = timeToMinutes(condition.time)
+	def states = listPreviousStates(device, attribute, currentValue, time, evt ? 1 : 0)
+    def thresholdTime = time * 60000
+    def stableTime = 0
+    for (state in states) {
+    	if (state.value <= value1) {
+        	stableTime += state.duration
+        } else {
+        	break
+        }
+    }
+    return (stableTime > 0) && (condition.for == "for at least" ? stableTime >= thresholdTime : stableTime < thresholdTime)
+}
+
+def eval_cond_was_greater_than(condition, device, attribute, oldValue, currentValue, value1, value2, evt, sourceEvt) {
+    def time = timeToMinutes(condition.time)
+	def states = listPreviousStates(device, attribute, currentValue, time, evt ? 1 : 0)
+    def thresholdTime = time * 60000
+    def stableTime = 0
+    for (state in states) {
+    	if (state.value > value1) {
+        	stableTime += state.duration
+        } else {
+        	break
+        }
+    }
+    return (stableTime > 0) && (condition.for == "for at least" ? stableTime >= thresholdTime : stableTime < thresholdTime)
+}
+
+def eval_cond_was_greater_than_or_equal_to(condition, device, attribute, oldValue, currentValue, value1, value2, evt, sourceEvt) {
+    def time = timeToMinutes(condition.time)
+	def states = listPreviousStates(device, attribute, currentValue, time, evt ? 1 : 0)
+    def thresholdTime = time * 60000
+    def stableTime = 0
+    for (state in states) {
+    	if (state.value >= value1) {
+        	stableTime += state.duration
+        } else {
+        	break
+        }
+    }
+    return (stableTime > 0) && (condition.for == "for at least" ? stableTime >= thresholdTime : stableTime < thresholdTime)
+}
+
+def eval_cond_was_even(condition, device, attribute, oldValue, currentValue, value1, value2, evt, sourceEvt) {
+    def time = timeToMinutes(condition.time)
+	def states = listPreviousStates(device, attribute, currentValue, time, evt ? 1 : 0)
+    def thresholdTime = time * 60000
+    def stableTime = 0
+    for (state in states) {
+    	if (state.value.isInteger() ? state.value.toInteger().mod(2) == 0 : false) {
+        	stableTime += state.duration
+        } else {
+        	break
+        }
+    }
+    return (stableTime > 0) && (condition.for == "for at least" ? stableTime >= thresholdTime : stableTime < thresholdTime)
+}
+
+def eval_cond_was_odd(condition, device, attribute, oldValue, currentValue, value1, value2, evt, sourceEvt) {
+    def time = timeToMinutes(condition.time)
+	def states = listPreviousStates(device, attribute, currentValue, time, evt ? 1 : 0)
+    def thresholdTime = time * 60000
+    def stableTime = 0
+    for (state in states) {
+    	if (state.value.isInteger() ? state.value.toInteger().mod(2) == 1 : false) {
+        	stableTime += state.duration
+        } else {
+        	break
+        }
+    }
+    return (stableTime > 0) && (condition.for == "for at least" ? stableTime >= thresholdTime : stableTime < thresholdTime)
+}
+
+def eval_cond_was_in_range(condition, device, attribute, oldValue, currentValue, value1, value2, evt, sourceEvt) {
+    def time = timeToMinutes(condition.time)
+	def states = listPreviousStates(device, attribute, currentValue, time, evt ? 1 : 0)
+    def thresholdTime = time * 60000
+    def stableTime = 0
+    for (state in states) {
+    	if (value1 < value2 ? (state.value >= value1) && (state.value <= value2) : (state.value >= value2) && (state.value <= value1)) {
+        	stableTime += state.duration
+        } else {
+        	break
+        }
+    }
+    return (stableTime > 0) && (condition.for == "for at least" ? stableTime >= thresholdTime : stableTime < thresholdTime)
+}
+
+def eval_cond_was_outside_of_range(condition, device, attribute, oldValue, currentValue, value1, value2, evt, sourceEvt) {
+    def time = timeToMinutes(condition.time)
+	def states = listPreviousStates(device, attribute, currentValue, time, evt ? 1 : 0)
+    def thresholdTime = time * 60000
+    def stableTime = 0
+    for (state in states) {
+    	if (value1 < value2 ? (state.value < value1) || (state.value > value2) : (state.value < value2) || (state.value > value1)) {
+        	stableTime += state.duration
+        } else {
+        	break
+        }
+    }
+    return (stableTime > 0) && (condition.for == "for at least" ? stableTime >= thresholdTime : stableTime < thresholdTime)
+}
+
+/* triggers */
+def eval_trg_changes(condition, device, attribute, oldValue, currentValue, value1, value2, evt, sourceEvt) {
+	return oldValue != currentValue
+}
+
+def eval_trg_changes_to(condition, device, attribute, oldValue, currentValue, value1, value2, evt, sourceEvt) {
+	return !eval_cond_is_equal_to(condition, device, attribute, null, oldValue, value1, value2, evt, sourceEvt) &&
+    		eval_cond_is_equal_to(condition, device, attribute, null, currentValue, value1, value2, evt, sourceEvt)
+}
+
+def eval_trg_changes_away_from(condition, device, attribute, oldValue, currentValue, value1, value2, evt, sourceEvt) {
+	return !eval_cond_is_not_equal_to(condition, device, attribute, null, oldValue, value1, value2, evt, sourceEvt) &&
+    		eval_cond_is_not_equal_to(condition, device, attribute, null, currentValue, value1, value2, evt, sourceEvt)
+}
+
+def eval_trg_drops_below(condition, device, attribute, oldValue, currentValue, value1, value2, evt, sourceEvt) {
+	return !eval_cond_is_less_than(condition, device, attribute, null, oldValue, value1, value2, evt, sourceEvt) &&
+    		eval_cond_is_less_than(condition, device, attribute, null, currentValue, value1, value2, evt, sourceEvt)
+}
+
+def eval_trg_drops_to_or_below(condition, device, attribute, oldValue, currentValue, value1, value2, evt, sourceEvt) {
+	return !eval_cond_is_less_than_or_equal_to(condition, device, attribute, null, oldValue, value1, value2, evt, sourceEvt) &&
+    		eval_cond_is_less_than_or_equal_to(condition, device, attribute, null, currentValue, value1, value2, evt, sourceEvt)
+}
+
+def eval_trg_raises_over(condition, device, attribute, oldValue, currentValue, value1, value2, evt, sourceEvt) {
+	return !eval_cond_is_greater_than(condition, device, attribute, null, oldValue, value1, value2, evt, sourceEvt) &&
+    		eval_cond_is_greater_than(condition, device, attribute, null, currentValue, value1, value2, evt, sourceEvt)
+}
+
+def eval_trg_raises_to_or_over(condition, device, attribute, oldValue, currentValue, value1, value2, evt, sourceEvt) {
+	return !eval_cond_is_greater_than_or_equal_to(condition, device, attribute, null, oldValue, value1, value2, evt, sourceEvt) &&
+    		eval_cond_is_greater_than_or_equal_to(condition, device, attribute, null, currentValue, value1, value2, evt, sourceEvt)
+}
+
+def eval_trg_changes_to_even(condition, device, attribute, oldValue, currentValue, value1, value2, evt, sourceEvt) {
+	return !eval_cond_is_even(condition, device, attribute, null, oldValue, value1, value2, evt, sourceEvt) &&
+    		eval_cond_is_even(condition, device, attribute, null, currentValue, value1, value2, evt, sourceEvt)
+}
+
+def eval_trg_changes_to_odd(condition, device, attribute, oldValue, currentValue, value1, value2, evt, sourceEvt) {
+	return !eval_cond_is_odd(condition, device, attribute, null, oldValue, value1, value2, evt, sourceEvt) &&
+    		eval_cond_is_odd(condition, device, attribute, null, currentValue, value1, value2, evt, sourceEvt)
+}
+
+def eval_trg_enters_range(condition, device, attribute, oldValue, currentValue, value1, value2, evt, sourceEvt) {
+	return !eval_cond_is_in_range(condition, device, attribute, null, oldValue, value1, value2, evt, sourceEvt) &&
+    		eval_cond_is_in_range(condition, device, attribute, null, currentValue, value1, value2, evt, sourceEvt)
+}
+
+def eval_trg_exits_range(condition, device, attribute, oldValue, currentValue, value1, value2, evt, sourceEvt) {
+	return !eval_cond_is_outside_of_range(condition, device, attribute, null, oldValue, value1, value2, evt, sourceEvt) &&
+    		eval_cond_is_outside_of_range(condition, device, attribute, null, currentValue, value1, value2, evt, sourceEvt)
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 def dummy() {
 	//evaluates a condition
@@ -1587,3 +1861,4 @@ def dummy() {
     debug "Exiting dummy() after ${perf}ms", -1
 	
 }
+

@@ -1396,6 +1396,7 @@ def evaluateConditionSet(evt, primary) {
         debug "Event is eligible for evaluation, proceeding..."
         def evaluation = evaluateCondition(primary ? state.app.conditions: state.app.otherConditions, evt)
         log.info "${primary ? "PRIMARY" : "SECONDARY"} EVALUATION IS $evaluation\n${getConditionDescription(primary ? 0 : -1)}\n"
+        sendPush("${getConditionDescription(primary ? 0 : -1)}\n\nEvent ${evt.device}.${evt.name} = ${evt.value} >>> ${primary ? "primary" : "secondary"} evaluation is $evaluation")
     } else {
         debug "Event is ineligible for evaluation, ignoring..."
     }

@@ -1805,12 +1805,12 @@ def eval_trg_drops_to_or_below(condition, device, attribute, oldValue, currentVa
     		eval_cond_is_less_than_or_equal_to(condition, device, attribute, null, currentValue, value1, value2, evt, sourceEvt)
 }
 
-def eval_trg_raises_over(condition, device, attribute, oldValue, currentValue, value1, value2, evt, sourceEvt) {
+def eval_trg_raises_above(condition, device, attribute, oldValue, currentValue, value1, value2, evt, sourceEvt) {
 	return !eval_cond_is_greater_than(condition, device, attribute, null, oldValue, value1, value2, evt, sourceEvt) &&
     		eval_cond_is_greater_than(condition, device, attribute, null, currentValue, value1, value2, evt, sourceEvt)
 }
 
-def eval_trg_raises_to_or_over(condition, device, attribute, oldValue, currentValue, value1, value2, evt, sourceEvt) {
+def eval_trg_raises_to_or_above(condition, device, attribute, oldValue, currentValue, value1, value2, evt, sourceEvt) {
 	return !eval_cond_is_greater_than_or_equal_to(condition, device, attribute, null, oldValue, value1, value2, evt, sourceEvt) &&
     		eval_cond_is_greater_than_or_equal_to(condition, device, attribute, null, currentValue, value1, value2, evt, sourceEvt)
 }

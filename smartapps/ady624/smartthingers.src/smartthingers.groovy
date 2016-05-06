@@ -17,6 +17,7 @@
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  *  Version history
+ *   5/06/2016 >>> v0.0.008.20160506 - Alpha test version - Minor improvements
  *   5/05/2016 >>> v0.0.007.20160505 - Alpha test version - All conditions implemented, simple triggers implemented. History-based triggers ("...stays...") not working yet
  *   5/05/2016 >>> v0.0.006.20160505 - Alpha test version - Simple conditions implemented. All "is" type conditions should work
  *   5/04/2016 >>> v0.0.005.20160504 - Alpha test version - added full list of standard capabilities, attributes and commands, improved condition UI
@@ -129,7 +130,7 @@ def attributes() {
     	[ name: "battery",					type: "number",			range: "0..100",		unit: "%",		options: null,																								],
     	[ name: "beacon",					type: "enum",			range: null,			unit: null,		options: ["present", "not present"],																		],
         [ name: "button",					type: "enum",			range: null,			unit: null,		options: ["held", "pushed"],																				],
-    	[ name: "carbonDioxide",			type: "number",			range: "0..*",			unit: null,		options: null,																								],
+    	[ name: "carbonDioxide",			type: "decimal",		range: "0..*",			unit: null,		options: null,																								],
     	[ name: "carbonMonoxide",			type: "enum",			range: null,			unit: null,		options: ["clear", "detected", "tested"],																	],
     	[ name: "color",					type: "color",			range: null,			unit: null,		options: null,																								],
     	[ name: "hue",						type: "number",			range: "0..100",		unit: "%",		options: null,																								],
@@ -142,7 +143,7 @@ def attributes() {
     	[ name: "consumable",				type: "enum",			range: null,			unit: null,		options: ["missing", "good", "replace", "maintenance_required", "order"],									],
     	[ name: "contact",					type: "enum",			range: null,			unit: null,		options: ["open", "closed"],																				],
     	[ name: "door",						type: "enum",			range: null,			unit: null,		options: ["unknown", "closed", "open", "closing", "opening"],												],
-    	[ name: "energy",					type: "number",			range: "0..*",			unit: "kWh",	options: null,																								],
+    	[ name: "energy",					type: "decimal",		range: "0..*",			unit: "kWh",	options: null,																								],
     	[ name: "illuminance",				type: "number",			range: "0..*",			unit: "lux",	options: null,																								],
     	[ name: "image",					type: "image",			range: null,			unit: null,		options: null,																								],
     	[ name: "lock",						type: "enum",			range: null,			unit: null,		options: ["locked", "unlocked"],																			],
@@ -152,7 +153,7 @@ def attributes() {
     	[ name: "status",					type: "string",			range: null,			unit: null,		options: null,																								],								
     	[ name: "mute",						type: "enum",			range: null,			unit: null,		options: ["muted", "unmuted"],																				],
     	[ name: "pH",						type: "decimal",		range: "0..14",			unit: null,		options: null,																								],
-    	[ name: "power",					type: "number",			range: "0..*",			unit: "W",		options: null,																								],
+    	[ name: "power",					type: "decimal",		range: "0..*",			unit: "W",		options: null,																								],
     	[ name: "presence",					type: "enum",			range: null,			unit: null,		options: ["present", "not present"],																		],
     	[ name: "humidity",					type: "number",			range: "0..100",		unit: "%",		options: null,																								],
         [ name: "shock",					type: "enum",			range: null,			unit: null,		options: ["detected", "clear"],																				],
@@ -169,9 +170,9 @@ def attributes() {
     	[ name: "thermostatMode",			type: "enum",			range: null,			unit: null,		options: ["off", "auto", "cool", "heat", "emergency heat"],													],
     	[ name: "thermostatFanMode",		type: "enum",			range: null,			unit: null,		options: ["auto", "on", "circulate"],																		],
     	[ name: "thermostatOperatingState",	type: "enum",			range: null,			unit: null,		options: ["idle", "pending cool", "cooling", "pending heat", "heating", "fan only", "vent economizer"],		],
-        [ name: "coolingSetpoint",			type: "number",			range: "-127..127",		unit: tempUnit,	options: null,																								],
-        [ name: "heatingSetpoint",			type: "number",			range: "-127..127",		unit: tempUnit,	options: null,																								],
-        [ name: "thermostatSetpoint",		type: "number",			range: "-127..127",		unit: tempUnit,	options: null,																								],
+        [ name: "coolingSetpoint",			type: "decimal",		range: "-127..127",		unit: tempUnit,	options: null,																								],
+        [ name: "heatingSetpoint",			type: "decimal",		range: "-127..127",		unit: tempUnit,	options: null,																								],
+        [ name: "thermostatSetpoint",		type: "decimal",		range: "-127..127",		unit: tempUnit,	options: null,																								],
         [ name: "sessionStatus",			type: "enum",			range: null,			unit: null,		options: ["paused", "stopped", "running", "canceled"],														],
     	[ name: "threeAxis",				type: "threeAxis",		range: "0..1024",		unit: null,		options: null,																								],
     	[ name: "touch",					type: "enum",			range: null,			unit: null,		options: ["touched"],																						],
@@ -1384,6 +1385,8 @@ def broadcastDeviceEvent(evt, primary, secondary) {
 def evaluateConditionSet(evt, primary) {
 	//executes whenever a device in the primary or secondary if block has an event
     def perf = now()
+    def pushNote = null
+    
 	debug "Entering evaluateConditionSet()", 1
     debug "Event received by the ${primary ? "primary" : "secondary"} IF block evaluation for device ${evt.device}, attribute ${evt.name}='${evt.value}', isStateChange=${evt.isStateChange()}, currentValue=${evt.device.currentValue(evt.name)}, determining eligibility"
     //check for triggers - if the primary IF block has triggers and the event is not related to any trigger
@@ -1396,13 +1399,17 @@ def evaluateConditionSet(evt, primary) {
         debug "Event is eligible for evaluation, proceeding..."
         def evaluation = evaluateCondition(primary ? state.app.conditions: state.app.otherConditions, evt)
         log.info "${primary ? "PRIMARY" : "SECONDARY"} EVALUATION IS $evaluation\n${getConditionDescription(primary ? 0 : -1)}\n"
-        sendPush("${getConditionDescription(primary ? 0 : -1)}\n\nEvent ${evt.device}.${evt.name} = ${evt.value} >>> ${primary ? "primary" : "secondary"} evaluation is $evaluation")
+        pushNote = "${evt.device}.${evt.name} >>> ${evt.value}\n${primary ? "primary" : "secondary"} evaluation result: $evaluation\n\n${getConditionDescription(primary ? 0 : -1)}\n\nEvent received after ${perf - evt.date.getTime()}ms\n"
     } else {
         debug "Event is ineligible for evaluation, ignoring..."
     }
     perf = now() - perf
     debug "Exiting evaluateConditionSet() after ${perf}ms", -1
-    
+
+	if (pushNote) {
+    	sendPush(pushNote + "Event processed in ${perf}ms")
+    }
+
     return evaluation
 }
 
@@ -1481,10 +1488,8 @@ def evaluateDeviceCondition(condition, evt) {
                 def deviceResult = false
                 def ownsEvent = (evt.deviceId == device.id) && (evt.name == condition.attr)
                 def oldValue = null
-                if (condition.trg) {
-                	def cachedValue = state.cache[device.id + "-" + condition.attr]
-                    if (cachedValue) oldValue = cachedValue.o
-                }
+                def cachedValue = state.cache[device.id + "-" + condition.attr]
+                if (cachedValue) oldValue = cachedValue.o
             	def currentValue = ownsEvent ? evt.value : device.currentValue(condition.attr)
                 def value1 = condition.dev1 && settings["condDev${condition.id}#1"] ? settings["condDev${condition.id}#1"].currentValue(condition.attr) : condition.val1
                 def value2 = condition.dev2 && settings["condDev${condition.id}#2"] ? settings["condDev${condition.id}#2"].currentValue(condition.attr) : condition.val2

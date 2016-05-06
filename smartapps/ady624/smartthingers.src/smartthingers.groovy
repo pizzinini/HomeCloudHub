@@ -17,6 +17,7 @@
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  *  Version history
+ *   5/06/2016 >>> v0.0.009.20160506 - Alpha test version - Partial support for Location Mode, Smart Home Monitor and Date & Time - work in progress
  *   5/06/2016 >>> v0.0.008.20160506 - Alpha test version - Minor improvements
  *   5/05/2016 >>> v0.0.007.20160505 - Alpha test version - All conditions implemented, simple triggers implemented. History-based triggers ("...stays...") not working yet
  *   5/05/2016 >>> v0.0.006.20160505 - Alpha test version - Simple conditions implemented. All "is" type conditions should work
@@ -59,8 +60,11 @@ def capabilities() {
 	return [
     	[ name: "accelerationSensor",				display: "Acceleration Sensor",				attribute: "acceleration",				commands: null,																		multiple: true,			],
     	[ name: "alarm",							display: "Alarm",							attribute: "alarm",						commands: ["off", "strobe", "siren", "both"],										multiple: true,			],
+    	[ name: "doorControl",						display: "Automatic Door",					attribute: "door",						commands: ["open", "close"],														multiple: true,			],
+    	[ name: "garageDoorControl",				display: "Automatic Garage Door",			attribute: "door",						commands: ["open", "close"],														multiple: true,			],
         [ name: "battery",							display: "Battery",							attribute: "battery",					commands: null,																		multiple: true,			],
     	[ name: "beacon",							display: "Beacon",							attribute: "presence",					commands: null,																		multiple: true,			],
+    	[ name: "switchLevel",						display: "Bulb",							attribute: "level",						commands: ["setLevel"],															multiple: true,			],
         [ name: "button",							display: "Button",							attribute: "button",					commands: null,																		multiple: true,			],
     	[ name: "carbonDioxideMeasurement",			display: "Carbon Dioxide Measurement",		attribute: "carbonDioxide",				commands: null,																		multiple: true,			],
         [ name: "carbonMonoxideDetector",			display: "Carbon Monoxide Detector",		attribute: "carbonMonoxide",			commands: null,																		multiple: true,			],
@@ -69,13 +73,13 @@ def capabilities() {
     	[ name: "configure",						display: "Configure",						attribute: null,						commands: ["configure"],															multiple: true,			],
     	[ name: "consumable",						display: "Consumable",						attribute: "consumable",				commands: ["setConsumableStatus"],													multiple: true,			],
 		[ name: "contactSensor",					display: "Contact Sensor",					attribute: "contact",					commands: null,																		multiple: true,			],
+    	[ name: "dateAndTime",						display: "Date & Time",						attribute: "time",						commands: null, /* wish we could control time */									multiple: true,			, virtualDevice: [id: "dt"],		virtualDeviceName: "Date & Time"	],
     	[ name: "switchLevel",						display: "Dimmer",							attribute: "level",						commands: ["setLevel"],																multiple: true,			],
-    	[ name: "doorControl",						display: "Door",							attribute: "door",						commands: ["open", "close"],														multiple: true,			],
     	[ name: "energyMeter",						display: "Energy Meter",					attribute: "energy",					commands: null,																		multiple: true,			],
-    	[ name: "garageDoorControl",				display: "Garage Door",						attribute: "door",						commands: ["open", "close"],														multiple: true,			],
         [ name: "illuminanceMeasurement",			display: "Illuminance Measurement",			attribute: "illuminance",				commands: null,																		multiple: true,			],
         [ name: "imageCapture",						display: "Image Capture",					attribute: "image",						commands: ["take"],																	multiple: true,			],
     	[ name: "waterSensor",						display: "Leak Sensor",						attribute: "water",						commands: null,																		multiple: true,			],
+        [ name: "locationMode",						display: "Location Mode",					attribute: "mode",						commands: ["setMode"],																multiple: false,		, virtualDevice: location	],
         [ name: "lock",								display: "Lock",							attribute: "lock",						commands: ["lock", "unlock"],														multiple: true,			],
     	[ name: "mediaController",					display: "Media Controller",				attribute: "currentActivity",			commands: ["startActivity", "getAllActivities", "getCurrentActivity"],				multiple: true,			],
     	[ name: "momentary",						display: "Momentary",						attribute: null,						commands: ["push"],																	multiple: true,			],
@@ -94,6 +98,7 @@ def capabilities() {
     	[ name: "signalStrength",					display: "Signal Strength",					attribute: "lqi",						commands: null,																		multiple: true,			],
     	[ name: "alarm",							display: "Siren",							attribute: "alarm",						commands: ["off", "strobe", "siren", "both"],										multiple: true,			],
     	[ name: "sleepSensor",						display: "Sleep Sensor",					attribute: "sleeping",					commands: null,																		multiple: true,			],
+    	[ name: "smartHomeMonitor",					display: "Smart Home Monitor",				attribute: "alarmSystemStatus",			commands: null,																		multiple: true,			, virtualDevice: location,	virtualDeviceName: "Smart Home Monitor"	],
     	[ name: "smokeDetector",					display: "Smoke Detector",					attribute: "smoke",						commands: null,																		multiple: true,			],
         [ name: "soundSensor",						display: "Sound Sensor",					attribute: "sound",						commands: null,																		multiple: true,			],
     	[ name: "speechSynthesis",					display: "Speech Synthesis",				attribute: null,						commands: ["speak"],																multiple: true,			],
@@ -125,61 +130,64 @@ def capabilities() {
 def attributes() {
 	def tempUnit = "°" + location.temperatureScale
 	return [
-    	[ name: "acceleration",				type: "enum",			range: null,			unit: null,		options: ["active", "inactive"],																			],
-    	[ name: "alarm",					type: "enum",			range: null,			unit: null,		options: ["off", "strobe", "siren", "both"],																],
-    	[ name: "battery",					type: "number",			range: "0..100",		unit: "%",		options: null,																								],
-    	[ name: "beacon",					type: "enum",			range: null,			unit: null,		options: ["present", "not present"],																		],
-        [ name: "button",					type: "enum",			range: null,			unit: null,		options: ["held", "pushed"],																				],
-    	[ name: "carbonDioxide",			type: "decimal",		range: "0..*",			unit: null,		options: null,																								],
-    	[ name: "carbonMonoxide",			type: "enum",			range: null,			unit: null,		options: ["clear", "detected", "tested"],																	],
-    	[ name: "color",					type: "color",			range: null,			unit: null,		options: null,																								],
-    	[ name: "hue",						type: "number",			range: "0..100",		unit: "%",		options: null,																								],
-    	[ name: "saturation",				type: "number",			range: "0..100",		unit: "%",		options: null,																								],
-    	[ name: "hex",						type: "hexcolor",		range: null,			unit: null,		options: null,																								],
-    	[ name: "saturation",				type: "number",			range: "0..100",		unit: "%",		options: null,																								],
-    	[ name: "level",					type: "number",			range: "0..100",		unit: "%",		options: null,																								],
-    	[ name: "switch",					type: "enum",			range: null,			unit: null,		options: ["on", "off"],																						],
-    	[ name: "colorTemperature",			type: "number",			range: "2000..7000",	unit: "°K",		options: null,																								],
-    	[ name: "consumable",				type: "enum",			range: null,			unit: null,		options: ["missing", "good", "replace", "maintenance_required", "order"],									],
-    	[ name: "contact",					type: "enum",			range: null,			unit: null,		options: ["open", "closed"],																				],
-    	[ name: "door",						type: "enum",			range: null,			unit: null,		options: ["unknown", "closed", "open", "closing", "opening"],												],
-    	[ name: "energy",					type: "decimal",		range: "0..*",			unit: "kWh",	options: null,																								],
-    	[ name: "illuminance",				type: "number",			range: "0..*",			unit: "lux",	options: null,																								],
-    	[ name: "image",					type: "image",			range: null,			unit: null,		options: null,																								],
-    	[ name: "lock",						type: "enum",			range: null,			unit: null,		options: ["locked", "unlocked"],																			],
-    	[ name: "activities",				type: "string",			range: null,			unit: null,		options: null,																								],
-    	[ name: "currentActivity",			type: "string",			range: null,			unit: null,		options: null,																								],
-    	[ name: "motion",					type: "enum",			range: null,			unit: null,		options: ["active", "inactive"],																			],
-    	[ name: "status",					type: "string",			range: null,			unit: null,		options: null,																								],								
-    	[ name: "mute",						type: "enum",			range: null,			unit: null,		options: ["muted", "unmuted"],																				],
-    	[ name: "pH",						type: "decimal",		range: "0..14",			unit: null,		options: null,																								],
-    	[ name: "power",					type: "decimal",		range: "0..*",			unit: "W",		options: null,																								],
-    	[ name: "presence",					type: "enum",			range: null,			unit: null,		options: ["present", "not present"],																		],
-    	[ name: "humidity",					type: "number",			range: "0..100",		unit: "%",		options: null,																								],
-        [ name: "shock",					type: "enum",			range: null,			unit: null,		options: ["detected", "clear"],																				],
-    	[ name: "lqi",						type: "number",			range: "0..255",		unit: null,		options: null,																								],
-    	[ name: "rssi",						type: "number",			range: "0..100",		unit: "%",		options: null,																								],
-    	[ name: "sleeping",					type: "enum",			range: null,			unit: null,		options: ["sleeping", "not sleeping"],																		],
-    	[ name: "smoke",					type: "enum",			range: null,			unit: null,		options: ["clear", "detected", "tested"],																	],
-    	[ name: "sound",					type: "enum",			range: null,			unit: null,		options: ["detected", "not detected"],																		],
-        [ name: "steps",					type: "number",			range: "0..*",			unit: null,		options: null,																								],
-    	[ name: "goal",						type: "number",			range: "0..*",			unit: null,		options: null,																								],
-    	[ name: "soundPressureLevel",		type: "number",			range: "0..*",			unit: null,		options: null,																								],
-    	[ name: "tamper",					type: "enum",			range: null,			unit: null,		options: ["clear", "detected"],																				],
-    	[ name: "temperature",				type: "decimal",		range: "*..*",			unit: tempUnit,	options: null,																								],
-    	[ name: "thermostatMode",			type: "enum",			range: null,			unit: null,		options: ["off", "auto", "cool", "heat", "emergency heat"],													],
-    	[ name: "thermostatFanMode",		type: "enum",			range: null,			unit: null,		options: ["auto", "on", "circulate"],																		],
-    	[ name: "thermostatOperatingState",	type: "enum",			range: null,			unit: null,		options: ["idle", "pending cool", "cooling", "pending heat", "heating", "fan only", "vent economizer"],		],
-        [ name: "coolingSetpoint",			type: "decimal",		range: "-127..127",		unit: tempUnit,	options: null,																								],
-        [ name: "heatingSetpoint",			type: "decimal",		range: "-127..127",		unit: tempUnit,	options: null,																								],
-        [ name: "thermostatSetpoint",		type: "decimal",		range: "-127..127",		unit: tempUnit,	options: null,																								],
-        [ name: "sessionStatus",			type: "enum",			range: null,			unit: null,		options: ["paused", "stopped", "running", "canceled"],														],
-    	[ name: "threeAxis",				type: "threeAxis",		range: "0..1024",		unit: null,		options: null,																								],
-    	[ name: "touch",					type: "enum",			range: null,			unit: null,		options: ["touched"],																						],
-    	[ name: "valve",					type: "enum",			range: null,			unit: null,		options: ["open", "closed"],																				],
-        [ name: "voltage",					type: "decimal",		range: "*..*",			unit: "V",		options: null,																								],
-    	[ name: "water",					type: "enum",			range: null,			unit: null,		options: ["dry", "wet"],																					],
-    	[ name: "windowShade",				type: "enum",			range: null,			unit: null,		options: ["unknown", "open", "closed", "opening", "closing", "partially open"],								],
+    	[ name: "acceleration",				type: "enum",				range: null,			unit: null,		options: ["active", "inactive"],																			],
+    	[ name: "alarm",					type: "enum",				range: null,			unit: null,		options: ["off", "strobe", "siren", "both"],																],
+    	[ name: "battery",					type: "number",				range: "0..100",		unit: "%",		options: null,																								],
+    	[ name: "beacon",					type: "enum",				range: null,			unit: null,		options: ["present", "not present"],																		],
+        [ name: "button",					type: "enum",				range: null,			unit: null,		options: ["held", "pushed"],																				],
+    	[ name: "carbonDioxide",			type: "decimal",			range: "0..*",			unit: null,		options: null,																								],
+    	[ name: "carbonMonoxide",			type: "enum",				range: null,			unit: null,		options: ["clear", "detected", "tested"],																	],
+    	[ name: "color",					type: "color",				range: null,			unit: null,		options: null,																								],
+    	[ name: "hue",						type: "number",				range: "0..100",		unit: "%",		options: null,																								],
+    	[ name: "saturation",				type: "number",				range: "0..100",		unit: "%",		options: null,																								],
+    	[ name: "hex",						type: "hexcolor",			range: null,			unit: null,		options: null,																								],
+    	[ name: "saturation",				type: "number",				range: "0..100",		unit: "%",		options: null,																								],
+    	[ name: "level",					type: "number",				range: "0..100",		unit: "%",		options: null,																								],
+    	[ name: "switch",					type: "enum",				range: null,			unit: null,		options: ["on", "off"],																						],
+    	[ name: "colorTemperature",			type: "number",				range: "2000..7000",	unit: "°K",		options: null,																								],
+    	[ name: "consumable",				type: "enum",				range: null,			unit: null,		options: ["missing", "good", "replace", "maintenance_required", "order"],									],
+    	[ name: "contact",					type: "enum",				range: null,			unit: null,		options: ["open", "closed"],																				],
+    	[ name: "door",						type: "enum",				range: null,			unit: null,		options: ["unknown", "closed", "open", "closing", "opening"],												],
+    	[ name: "energy",					type: "decimal",			range: "0..*",			unit: "kWh",	options: null,																								],
+    	[ name: "illuminance",				type: "number",				range: "0..*",			unit: "lux",	options: null,																								],
+    	[ name: "image",					type: "image",				range: null,			unit: null,		options: null,																								],
+    	[ name: "lock",						type: "enum",				range: null,			unit: null,		options: ["locked", "unlocked"],																			],
+    	[ name: "activities",				type: "string",				range: null,			unit: null,		options: null,																								],
+    	[ name: "currentActivity",			type: "string",				range: null,			unit: null,		options: null,																								],
+    	[ name: "motion",					type: "enum",				range: null,			unit: null,		options: ["active", "inactive"],																			],
+    	[ name: "status",					type: "string",				range: null,			unit: null,		options: null,																								],								
+    	[ name: "mute",						type: "enum",				range: null,			unit: null,		options: ["muted", "unmuted"],																				],
+    	[ name: "pH",						type: "decimal",			range: "0..14",			unit: null,		options: null,																								],
+    	[ name: "power",					type: "decimal",			range: "0..*",			unit: "W",		options: null,																								],
+    	[ name: "presence",					type: "enum",				range: null,			unit: null,		options: ["present", "not present"],																		],
+    	[ name: "humidity",					type: "number",				range: "0..100",		unit: "%",		options: null,																								],
+        [ name: "shock",					type: "enum",				range: null,			unit: null,		options: ["detected", "clear"],																				],
+    	[ name: "lqi",						type: "number",				range: "0..255",		unit: null,		options: null,																								],
+    	[ name: "rssi",						type: "number",				range: "0..100",		unit: "%",		options: null,																								],
+    	[ name: "sleeping",					type: "enum",				range: null,			unit: null,		options: ["sleeping", "not sleeping"],																		],
+    	[ name: "smoke",					type: "enum",				range: null,			unit: null,		options: ["clear", "detected", "tested"],																	],
+    	[ name: "sound",					type: "enum",				range: null,			unit: null,		options: ["detected", "not detected"],																		],
+        [ name: "steps",					type: "number",				range: "0..*",			unit: null,		options: null,																								],
+    	[ name: "goal",						type: "number",				range: "0..*",			unit: null,		options: null,																								],
+    	[ name: "soundPressureLevel",		type: "number",				range: "0..*",			unit: null,		options: null,																								],
+    	[ name: "tamper",					type: "enum",				range: null,			unit: null,		options: ["clear", "detected"],																				],
+    	[ name: "temperature",				type: "decimal",			range: "*..*",			unit: tempUnit,	options: null,																								],
+    	[ name: "thermostatMode",			type: "enum",				range: null,			unit: null,		options: ["off", "auto", "cool", "heat", "emergency heat"],													],
+    	[ name: "thermostatFanMode",		type: "enum",				range: null,			unit: null,		options: ["auto", "on", "circulate"],																		],
+    	[ name: "thermostatOperatingState",	type: "enum",				range: null,			unit: null,		options: ["idle", "pending cool", "cooling", "pending heat", "heating", "fan only", "vent economizer"],		],
+        [ name: "coolingSetpoint",			type: "decimal",			range: "-127..127",		unit: tempUnit,	options: null,																								],
+        [ name: "heatingSetpoint",			type: "decimal",			range: "-127..127",		unit: tempUnit,	options: null,																								],
+        [ name: "thermostatSetpoint",		type: "decimal",			range: "-127..127",		unit: tempUnit,	options: null,																								],
+        [ name: "sessionStatus",			type: "enum",				range: null,			unit: null,		options: ["paused", "stopped", "running", "canceled"],														],
+    	[ name: "threeAxis",				type: "threeAxis",			range: "0..1024",		unit: null,		options: null,																								],
+    	[ name: "touch",					type: "enum",				range: null,			unit: null,		options: ["touched"],																						],
+    	[ name: "valve",					type: "enum",				range: null,			unit: null,		options: ["open", "closed"],																				],
+        [ name: "voltage",					type: "decimal",			range: "*..*",			unit: "V",		options: null,																								],
+    	[ name: "water",					type: "enum",				range: null,			unit: null,		options: ["dry", "wet"],																					],
+    	[ name: "windowShade",				type: "enum",				range: null,			unit: null,		options: ["unknown", "open", "closed", "opening", "closing", "partially open"],								],
+    	[ name: "mode",						type: "mode",				range: null,			unit: null,		options: location.modes,																					],
+    	[ name: "alarmSystemStatus",		type: "enum",				range: null,			unit: null,		options: ["Disarmed", "Armed/Stay", "Armed/Away"],															],
+    	[ name: "time",						type: "time",				range: null,			unit: null,		options: null,																								],
     ]
 }
 
@@ -187,6 +195,7 @@ def comparisons() {
 	def optionsEnum = [
         [ condition: "is", trigger: "changes to", parameters: 1, timed: false],
         [ condition: "is not", trigger: "changes away from", parameters: 1, timed: false],
+        [ condition: "is one of", trigger: "changes to one of", parameters: 1, timed: false, multiple: true, minOptions: 3],
         [ condition: "was", trigger: "stays", parameters: 1, timed: true],
         [ condition: "was not", parameters: 1, timed: true],
         [ trigger: "changes", parameters: 0, timed: false],
@@ -198,7 +207,7 @@ def comparisons() {
         [ condition: "is less than or equal to", trigger: "drops to or below", parameters: 1, timed: false],
         [ condition: "is greater than", trigger: "raises above", parameters: 1, timed: false],
         [ condition: "is greater than or equal to", trigger: "raises to or above", parameters: 1, timed: false],
-        [ condition: "is in range", trigger: "enters range", parameters: 2, timed: false],
+        [ condition: "is inside range", trigger: "enters range", parameters: 2, timed: false],
         [ condition: "is outside of range", trigger: "exits range", parameters: 2, timed: false],
         [ condition: "is even", trigger: "changes to an even value", parameters: 0, timed: false],
         [ condition: "is odd", trigger: "changes to an odd value", parameters: 0, timed: false],
@@ -208,27 +217,33 @@ def comparisons() {
         [ condition: "was less than or equal to", trigger: "stays less than or equal to", parameters: 1, timed: true],
         [ condition: "was greater than", trigger: "stays greater than", parameters: 1, timed: true],
         [ condition: "was greater than or equal to", trigger: "stays greater than or equal to", parameters: 1, timed: true],
-        [ condition: "was in range",trigger: "stays in range",  parameters: 2, timed: true],
+        [ condition: "was inside range",trigger: "stays inside range",  parameters: 2, timed: true],
         [ condition: "was outside range", trigger: "stays outside range", parameters: 2, timed: true],
         [ condition: "was even", trigger: "stays even", parameters: 0, timed: true],
         [ condition: "was odd", trigger: "stays odd", parameters: 0, timed: true],
         [ trigger: "changes", parameters: 0, timed: false],
     ]
     def optionsTime = [
-        [ condition: "is", trigger: "reaches", parameters: 1],
+        [ trigger: "reaches", parameters: 1],
         [ condition: "is before", parameters: 1],
         [ condition: "is after", parameters: 1],
         [ condition: "is between", parameters: 2],
+        [ condition: "is not between", parameters: 2],
 	]
 	return [
-    	[ type: "string",		options: optionsEnum,	],
-    	[ type: "enum",			options: optionsEnum,	],
-    	[ type: "number",		options: optionsNumber,	],
-    	[ type: "decimal",		options: optionsNumber	],
-    	[ type: "time",			options: optionsTime,	],        
+    	[ type: "string",				options: optionsEnum,	],
+    	[ type: "enum",					options: optionsEnum,	],
+    	[ type: "mode",					options: optionsEnum,	],
+    	[ type: "alarmSystemStatus",	options: optionsEnum,	],
+    	[ type: "number",				options: optionsNumber,	],
+    	[ type: "decimal",				options: optionsNumber	],
+    	[ type: "time",					options: optionsTime,	],        
     ]
 }
 
+def timeComparisonOptionValues(trigger) {
+   	return ["custom time", "midnight", "around midnight", "sunrise", "around sunrise", "noon", "around noon", "sunset", "around sunset"] + (trigger ? ["every number of minutes", "every number of hours"] : [])
+}
 
 def timeOptions() {
 	def result = ["1 minute"]
@@ -236,6 +251,26 @@ def timeOptions() {
     	result.push("$i minutes")
     }
 	return result
+}
+
+def timeRepeatOptions() {
+	return ["every day", "every number of days"]
+}
+
+def timeDayOfMonthOptions() {
+	def result = ["on the first...", "on the second...", "on the third...", "on the fourth...", "on the fifth...", "on the last...", "on the second-last..."]
+    for (def i =1; i <= 31; i++) {
+    	result.push("on day $i")
+    }
+	return result + ["on the last day"]
+}
+
+def timeDayOfWeekOptions() {
+	return ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+}
+
+def timeMonthOfYearOptions() {
+	return ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]
 }
 
 def timeToMinutes(time) {
@@ -446,60 +481,148 @@ def pageCondition(params) {
                 if (settings["condCap$id"]) {
                 	def capability = getCapabilityByDisplay(settings["condCap$id"])
                     if (capability) {
-                        def devices = settings["condDevices$id"]
-                		input "condDevices$id", "capability.${capability.name}", title: "${capability.display} list", required: false, state: (devices ? "complete" : null), multiple: capability.multiple, submitOnChange: true
-						if (devices && devices.size()) {
-							if (devices.size() > 1) {
-                    			input "condMode$id", "enum", title: "Evaluation mode", options: ["Any", "All"], required: true, multiple: false, defaultValue: "All", submitOnChange: true
-                            }
-                            def evalMode = settings["condMode$id"] == "All" ? "All" : "Any"
-                            
-                            //Attribute
-                            def attribute = cleanUpAttribute(settings["condAttr$id"])
-                            if (attribute == null) {
-                            	attribute = capability.attribute
-                            }
-                            //display the Attribute only in expert mode or in basic mode if it differs from the default capability attribute
-                            if ((attribute != capability.attribute) || settings["expert"]) {
-								input "condAttr$id", "enum", title: "Attribute", options: listCommonDeviceAttributes(devices), required: true, multiple: false, defaultValue: capability.attribute, submitOnChange: true
-                            }
-                            if (attribute) {                              
-                            	//Condition
-	                           	def attr = getAttributeByName(attribute)
+                    	if (capability.virtualDevice) {
+                        	def attribute = capability.attribute
+                            def attr = getAttributeByName(attribute)
+                            log.trace attr
+                            if (attribute == "time") {
+                            	//Date & Time support
                                 def comparison = cleanUpComparison(settings["condComp$id"])
-                    			input "condComp$id", "enum", title: "Comparison", options: listComparisonOptions(attribute, true), required: true, multiple: false, submitOnChange: true                                
-                                if (comparison) {                                	
-                                	//Value
-                                    def comp = getComparisonOption(attribute, comparison)
+                                log.trace comparison
+                                input "condComp$id", "enum", title: "Comparison", options: listComparisonOptions(attribute, true), required: true, multiple: false, submitOnChange: true
+                                if (comparison) {
+									def comp = getComparisonOption(attribute, comparison)
                                     if (attr && comp) {
-                                    	if (comp.parameters >= 1) {
-                                        	def value1 = settings["condValue$id#1"]
-                                            def device1 = settings["condDev$id#1"]
-                                            if (device1 == null) {
-                                				input "condValue$id#1", attr.type, title: (comp.parameters == 1 ? "Value" : "From value"), options: attr.options, range: attr.range, required: true, multiple: false, submitOnChange: true
-                                            }
-                                            if (value1 == null) {
-                                				input "condDev$id#1", "capability.${capability.name}", title: (device1 == null ? "... or choose a device to compare ..." : (comp.parameters == 1 ? "Device" : "From")), required: true, multiple: false, submitOnChange: true
+                                        //we have a valid comparison object
+                                        def trigger = (comp.trigger == comparison)
+                                        def recurring = false
+                                        for (def i = 1; i <= comp.parameters; i++) {
+                                            input "condValue$id#$i", "enum", title: (comp.parameters == 1 ? "Value" : (i == 1 ? "Time" : "And")), options: timeComparisonOptionValues(trigger), required: true, multiple: false, submitOnChange: true
+                                            def value = settings["condValue$id#$i"]
+                                            if (value) {
+                                                if (value.contains("custom")) {
+                                                    //using a time offset
+                                                    input "condTime$id#$i", "time", title: "Custom time", required: true, multiple: false, submitOnChange: true
+                                                }
+                                                if (value.contains("around")) {
+                                                    //using a time offset
+                                                    input "condOffset$id#$i", "number", title: "Offset (minutes)", range: "-180..180", required: true, multiple: false, defaultValue: 0, submitOnChange: true
+                                                }
+                                                if (value.contains("number")) {
+                                                    //using a time offset
+                                                    input "condEvery$id", "number", title: value.replace("every n", "N"), range: "1..*", required: true, multiple: false, defaultValue: 1, submitOnChange: true
+                                                    recurring = true
+                                                    break
+                                                }
                                             }
                                         }
-                                    	if (comp.parameters >= 2) {
-                                        	def value2 = settings["condValue$id#2"]
-                                            def device2 = settings["condDev$id#2"]
-                                            if (device2 == null) {
-                                				input "condValue$id#2", attr.type, title: "Through value", options: attr.options, range: attr.range, required: true, multiple: false, submitOnChange: true
+                                        if (trigger && !recurring) {
+											input "condRepeat$id", "enum", title: "Repeat", options: ["every day", "every number of days", "every month", "every number of months", "every year", "every number of years"], required: true, multiple: false, defaultValue: "every day", submitOnChange: true
+                                            def repeat = settings["condRepeat$id"]
+                                            if (repeat) {
+                                            	def incremental = repeat.contains("number")
+                                                if (incremental) {
+                                                    //using a time offset
+                                                    input "condRepeatEvery$id", "number", title: repeat.replace("every n", "N"), range: "2..*", required: true, multiple: false, defaultValue: 2, submitOnChange: true
+                                                    recurring = true
+                                                }
+                                                def monthOfYear = null
+                                                if (repeat.contains("month") || repeat.contains("year")) {
+                                                	//oh-oh, monthly
+                                                    input "condRepeatDay$id", "enum", title: "On", options: timeDayOfMonthOptions(), required: true, multiple: false, submitOnChange: true
+                                                    def dayOfMonth = settings["condRepeatDay$id"]
+                                                    def certainDay = false
+                                                    def dayOfWeek = null
+                                                    if (dayOfMonth) {
+                                                    	if (!dayOfMonth.contains("day")) {
+                                                        	certainDay = true
+															input "condDOWOM$id", "enum", title: "Day", options: timeDayOfWeekOptions(), required: true, multiple: false, submitOnChange: true
+                                                            dayOfWeek = settings["condDOWOM$id"]
+                                                        }
+                                                    }
+													if (repeat.contains("year") && (dayOfMonth) && (!certainDay || dayOfWeek)) {
+                                                		//oh-oh, yearly
+                                                    	input "condRepeatMonth$id", "enum", title: "Of", options: timeMonthOfYearOptions(), required: true, multiple: false, submitOnChange: true
+                                                    	monthOfYear = settings["condRepeatMonth$id"]
+                                                	}
+                                                }
                                             }
-                                            if (value2 == null) {
-                                				input "condDev$id#2", "capability.${capability.name}", title: (device2 == null ? "... or choose a device to compare ..." : "Through"), required: true, multiple: false, submitOnChange: true
-                                            }
-                                        }
-                                        
-                                        if (comp.timed) {
-                                        	input "condFor$id", "enum", title: "Time restriction", options: ["for at least", "for less than"], required: true, multiple: false, submitOnChange: true
-                                        	input "condTime$id", "enum", title: "Interval", options: timeOptions(), required: true, multiple: false, submitOnChange: true
+                                        	
                                         }
                                     }
                                 }
-                    			//input "condDevice$id", "", title: title, required: true, multiple: false, submitOnChange: true
+                            
+                            } else {
+                            	//Location Mode, Smart Home Monitor support
+                                def comparison = cleanUpComparison(settings["condComp$id"])
+                                input "condComp$id", "enum", title: "Comparison", options: listComparisonOptions(attribute, true), required: true, multiple: false, submitOnChange: true                                
+                                if (comparison) {                                	
+                                    //Value
+                                    def comp = getComparisonOption(attribute, comparison)
+                                    if (attr && comp) {
+                                        if (comp.parameters >= 1) {
+                                            input "condValue$id#1", attr.type, title: "Value", options: attr.options, range: attr.range, required: true, multiple: comp.multiple, submitOnChange: true
+                                        }
+                                    }
+                                }
+							}
+                        } else {                        
+                        	//physical device support
+                            def devices = settings["condDevices$id"]
+                            input "condDevices$id", "capability.${capability.name}", title: "${capability.display} list", required: false, state: (devices ? "complete" : null), multiple: capability.multiple, submitOnChange: true
+                            if (devices && devices.size()) {
+                                if (devices.size() > 1) {
+                                    input "condMode$id", "enum", title: "Evaluation mode", options: ["Any", "All"], required: true, multiple: false, defaultValue: "All", submitOnChange: true
+                                }
+                                def evalMode = settings["condMode$id"] == "All" ? "All" : "Any"
+
+                                //Attribute
+                                def attribute = cleanUpAttribute(settings["condAttr$id"])
+                                if (attribute == null) {
+                                    attribute = capability.attribute
+                                }
+                                //display the Attribute only in expert mode or in basic mode if it differs from the default capability attribute
+                                if ((attribute != capability.attribute) || settings["expert"]) {
+                                    input "condAttr$id", "enum", title: "Attribute", options: listCommonDeviceAttributes(devices), required: true, multiple: false, defaultValue: capability.attribute, submitOnChange: true
+                                }
+                                if (attribute) {                              
+                                    //Condition
+                                    def attr = getAttributeByName(attribute)
+                                    def comparison = cleanUpComparison(settings["condComp$id"])
+                                    input "condComp$id", "enum", title: "Comparison", options: listComparisonOptions(attribute, true), required: true, multiple: false, submitOnChange: true                                
+                                    if (comparison) {                                	
+                                        //Value
+                                        def comp = getComparisonOption(attribute, comparison)
+                                        if (attr && comp) {
+                                            if (comp.parameters >= 1) {
+                                                def value1 = settings["condValue$id#1"]
+                                                def device1 = settings["condDev$id#1"]
+                                                if (device1 == null) {
+                                                    input "condValue$id#1", attr.type, title: (comp.parameters == 1 ? "Value" : "From value"), options: attr.options, range: attr.range, required: true, multiple: comp.multiple, submitOnChange: true
+                                                }
+                                                if (value1 == null) {
+                                                    input "condDev$id#1", "capability.${capability.name}", title: (device1 == null ? "... or choose a device to compare ..." : (comp.parameters == 1 ? "Device" : "From")), required: true, multiple: comp.multiple, submitOnChange: true
+                                                }
+                                            }
+                                            if (comp.parameters >= 2) {
+                                                def value2 = settings["condValue$id#2"]
+                                                def device2 = settings["condDev$id#2"]
+                                                if (device2 == null) {
+                                                    input "condValue$id#2", attr.type, title: "Through value", options: attr.options, range: attr.range, required: true, multiple: false, submitOnChange: true
+                                                }
+                                                if (value2 == null) {
+                                                    input "condDev$id#2", "capability.${capability.name}", title: (device2 == null ? "... or choose a device to compare ..." : "Through"), required: true, multiple: false, submitOnChange: true
+                                                }
+                                            }
+
+                                            if (comp.timed) {
+                                                input "condFor$id", "enum", title: "Time restriction", options: ["for at least", "for less than"], required: true, multiple: false, submitOnChange: true
+                                                input "condTime$id", "enum", title: "Interval", options: timeOptions(), required: true, multiple: false, submitOnChange: true
+                                            }
+                                        }
+                                    }
+                                    //input "condDevice$id", "", title: title, required: true, multiple: false, submitOnChange: true
+                                }
                             }
                         }
                     }
@@ -600,14 +723,15 @@ def listComparisonOptions(attributeName, allowTriggers) {
     def triggers = []
     def attribute = getAttributeByName(attributeName)
     if (attribute) {
+    	def optionCount = attribute.options ? attribute.options.size() : 0
         def attributeType = attribute.type
         for (comparison in comparisons()) {
             if (comparison.type == attributeType) {
                 for (option in comparison.options) {
-                    if (option.condition) {
+                    if (option.condition && (!option.minOptions || option.minOptions <= optionCount)) {
                         conditions.push(conditionPrefix() + option.condition)
                     }
-                    if (allowTriggers && option.trigger) {
+                    if (allowTriggers && option.trigger && (!option.minOptions || option.minOptions <= optionCount)) {
                         triggers.push(triggerPrefix() + option.trigger)
                     }
                 }
@@ -618,7 +742,7 @@ def listComparisonOptions(attributeName, allowTriggers) {
 }
 
 //returns the comparison option object for the given attribute and selected comparison
-def getComparisonOption(attributeName, comparisonOption) {
+def getComparisonOption(attributeName, comparisonOption) {	
     def attribute = getAttributeByName(attributeName)
     if (attribute) {
 		def attributeType = attribute.type
@@ -852,14 +976,16 @@ def getConditionDescription(id, level) {
     if (!conditionGroup) {
     	//single condition
         def devices = settings["condDevices$id"]
-        if (devices && devices.size()) {
-            def evaluation = (devices.size() > 1 ? (condition.mode == "All" ? "Each of " : "Any of ") : "")
-            def deviceList = buildDeviceNameList(devices, "or")
-            def attribute = condition.attr
-            def attr = getAttributeByName(attribute)
+        def capability = getCapabilityByDisplay(condition.cap)
+        def virtualDevice = capability ? capability.virtualDevice : null
+        if (virtualDevice || (devices && devices.size())) {
+            def evaluation = (virtualDevice ? "" : (devices.size() > 1 ? (condition.mode == "All" ? "Each of " : "Any of ") : ""))
+            def deviceList = (virtualDevice ? (capability.virtualDeviceName ? capability.virtualDeviceName : virtualDevice.name) : buildDeviceNameList(devices, "or")) + " "
+	        def attribute = condition.attr + " "
+            def attr = getAttributeByName(condition.attr)
             def unit = (attr && attr.unit ? attr.unit : "")
             def comparison = cleanUpComparison(condition.comp)
-            def comp = getComparisonOption(attribute, comparison)
+            def comp = getComparisonOption(condition.attr, comparison)
             def values = " [ERROR]"
             def time = ""
             if (comp) {
@@ -868,10 +994,10 @@ def getConditionDescription(id, level) {
                     	values = ""
                         break
                     case 1:
-                    	values = " " + (condition.dev1 ? condition.dev1 + "'s $attribute" : condition.val1 + unit)
+                    	values = " ${(condition.dev1 ? condition.dev1 + "'s $attribute" : condition.val1)}${unit}"
                         break
                     case 2:
-                    	values = " " + (condition.dev1 ? condition.dev1 + "'s $attribute" : condition.val1 + unit) + " - " + (condition.dev2 ? condition.dev2 + "'s $attribute" : condition.val2 + unit)
+                    	values = " ${(condition.dev1 ? condition.dev1 + "'s $attribute" : condition.val1 + unit) + " - " + (condition.dev2 ? condition.dev2 + "'s $attribute" : condition.val2 + unit)}"
                         break                       
             	}
                 if (comp.timed) {
@@ -882,7 +1008,10 @@ def getConditionDescription(id, level) {
                     }
                 }
             }
-            return tab + (condition.trg ? triggerPrefix() : conditionPrefix()) + evaluation + deviceList + " " + attribute + " " + comparison + values + time
+            if (virtualDevice) {
+            	attribute = ""
+            }
+            return tab + (condition.trg ? triggerPrefix() : conditionPrefix()) + evaluation + deviceList + attribute + comparison + values + time
         }
         return "Sorry, incomplete rule"
 	} else {
@@ -993,7 +1122,7 @@ def _cleanUpCondition(condition, deleteGroups) {
 	if (condition.id > 0) {
     	if (condition.children == null) {
         	//if regular condition
-        	if (settings["condDevices${condition.id}"] == null) {
+        	if ((condition.cap != "Location Mode") && (condition.cap != "Smart Home Monitor") && (condition.cap != "Date & Time") && settings["condDevices${condition.id}"] == null) {
 	        	deleteCondition(condition.id);
 	            return true
 	        //} else {
@@ -1012,7 +1141,7 @@ def _cleanUpCondition(condition, deleteGroups) {
 }
 
 def updateCondition(condition) {
-	condition.capability = settings["condCap${condition.id}"]
+	condition.cap = settings["condCap${condition.id}"]
 	condition.dev = []
     for (device in settings["condDevices${condition.id}"])
     {
@@ -1022,7 +1151,7 @@ def updateCondition(condition) {
 	condition.mode = settings["condMode${condition.id}"]
     condition.attr = cleanUpAttribute(settings["condAttr${condition.id}"])
     if (!condition.attr) {
-	    def cap = getCapabilityByDisplay(condition.capability)
+	    def cap = getCapabilityByDisplay(condition.cap)
         if (cap && cap.attribute) {
     		condition.attr = cap.attribute
         }
@@ -1133,8 +1262,9 @@ def subscribeToDevices(condition, triggersOnly, handler, subscriptions, onlySubs
         } else {
         	if (condition.trg || !triggersOnly) {
             	//get the details
-            	def devices = settings["condDevices${condition.id}"]
-                def attribute = cleanUpAttribute(settings["condAttr${condition.id}"])
+                def capability = getCapabilityByDisplay(condition.cap)
+            	def devices = capability.virtualDevice ? [capability.virtualDevice] : settings["condDevices${condition.id}"]
+                def attribute = capability.virtualDevice ? capability.attribute : cleanUpAttribute(settings["condAttr${condition.id}"])
                 if (devices) {
                 	for (device in devices) {
                     	def subscription = "${device.id}-${attribute}"
@@ -1357,7 +1487,8 @@ def broadcastDeviceEvent(evt, primary, secondary) {
 	//filter duplicate events and broadcast event to proper IF blocks
     def perf = now()
 	debug "Entering broadcastDeviceEvent()", 1
-	debug "Event was generated on ${evt.date} (${evt.date.getTime()}), about ${now() - evt.date.getTime()}ms ago"   
+	debug "Event was generated on ${evt.date} (${evt.date.getTime()}), about ${now() - evt.date.getTime()}ms ago"  
+    log.trace "Event ${evt.name} for device ${evt.device} with id ${evt.deviceId} and value ${evt.value}"
     def cachedValue = atomicState.cache[evt.deviceId + '-' + evt.name]
     def eventTime = evt.date.getTime()
 	state.cache[evt.deviceId + '-' + evt.name] = [o: cachedValue ? cachedValue.v : null, v: evt.value, t: eventTime ]
@@ -1520,14 +1651,19 @@ def evaluateDeviceCondition(condition, evt) {
                 }
                 
         		//compound the result, depending on mode
+                def finalResult = false
         		switch (mode) {
 	            	case "All":
 	                	result = result && deviceResult
+                        finalResult = !result
 	                	break
 	                case "Any":
 	                	result = result || deviceResult
+                        finalResult = result
 	                	break
 	            }
+                //optimize the loop to exit when we find a result that's going to be the final one (AND encountered a false, or OR encountered a true)
+                if (finalResult) break
             }
         }
         
@@ -1588,7 +1724,7 @@ def eval_cond_is_odd(condition, device, attribute, oldValue, currentValue, value
 	return false
 }
 
-def eval_cond_is_in_range(condition, device, attribute, oldValue, currentValue, value1, value2, evt, sourceEvt) {
+def eval_cond_is_inside_range(condition, device, attribute, oldValue, currentValue, value1, value2, evt, sourceEvt) {
 	if (value1 < value2) {
 		return (currentValue >= value1) && (currentValue <= value2)
     } else {
@@ -1755,7 +1891,7 @@ def eval_cond_was_odd(condition, device, attribute, oldValue, currentValue, valu
     return (stableTime > 0) && (condition.for == "for at least" ? stableTime >= thresholdTime : stableTime < thresholdTime)
 }
 
-def eval_cond_was_in_range(condition, device, attribute, oldValue, currentValue, value1, value2, evt, sourceEvt) {
+def eval_cond_was_inside_range(condition, device, attribute, oldValue, currentValue, value1, value2, evt, sourceEvt) {
     def time = timeToMinutes(condition.time)
 	def states = listPreviousStates(device, attribute, currentValue, time, evt ? 1 : 0)
     def thresholdTime = time * 60000
@@ -1831,8 +1967,8 @@ def eval_trg_changes_to_odd(condition, device, attribute, oldValue, currentValue
 }
 
 def eval_trg_enters_range(condition, device, attribute, oldValue, currentValue, value1, value2, evt, sourceEvt) {
-	return !eval_cond_is_in_range(condition, device, attribute, null, oldValue, value1, value2, evt, sourceEvt) &&
-    		eval_cond_is_in_range(condition, device, attribute, null, currentValue, value1, value2, evt, sourceEvt)
+	return !eval_cond_is_inside_range(condition, device, attribute, null, oldValue, value1, value2, evt, sourceEvt) &&
+    		eval_cond_is_inside_range(condition, device, attribute, null, currentValue, value1, value2, evt, sourceEvt)
 }
 
 def eval_trg_exits_range(condition, device, attribute, oldValue, currentValue, value1, value2, evt, sourceEvt) {

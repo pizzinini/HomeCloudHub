@@ -52,6 +52,8 @@ metadata {
         command "stay"
         command "away"
         command "setMode"
+        
+        command "describeAttributes"
 	}
 
     simulator {
@@ -115,6 +117,13 @@ metadata {
 
 // parse events into attributes
 def parse(String description) {
+}
+
+def describeAttributes(payload) {
+	payload.attributes = [
+    	[ name: "system-status",	type: "enum",	options: ["Home", "Home Bypass", "Home ExitDelay", "Stay", "Stay AlarmPending", "Away", "Away AlarmPending", "Instant", "Instant AlarmPending"]	],
+    ]
+    return null
 }
 
 def configure(mode) {

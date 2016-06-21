@@ -31,7 +31,7 @@ metadata {
         capability "Configuration"
         capability "Switch"
         capability "Switch Level"
-        attribute "mode", "string"
+        attribute "digital-life-mode", "enum", ["Home", "Stay", "Instant", "Away"]
         attribute "id", "string"
         attribute "module", "string"       
         attribute "type", "string"
@@ -100,12 +100,12 @@ metadata {
             state "default", label: '${currentValue}', backgroundColor: "#808080", icon:"st.locks.lock.locked"
         }
 
-		standardTile("mode1", "device.mode", width: 3, height: 3, ) {
+		standardTile("mode1", "device.digital-life-mode", width: 3, height: 3, ) {
             state "default", label: 'Home', backgroundColor: "#79b821", icon:"st.locks.lock.unlocked", action:"home"
             state "Home", label: 'Stay', backgroundColor: "#1ea8ff", icon:"st.locks.lock.locked", action:"stay"
         }
 
-		standardTile("mode2", "device.mode", width: 3, height: 3, ) {
+		standardTile("mode2", "device.digital-life-mode", width: 3, height: 3, ) {
             state "default", label: 'Away', backgroundColor: "#1ea8ff", icon:"st.locks.lock.locked", action:"away"
             state "Away", label: 'Stay', backgroundColor: "#1ea8ff", icon:"st.locks.lock.locked", action:"stay"
         }
@@ -134,8 +134,8 @@ def setLevel(level) {
 	if (level < 0) {
     	level = 0
     }
-    if (level > 2) {
-    	level = 2
+    if (level > 3) {
+    	level = 3
     }
 	switch (level) {
     	case 0:
@@ -143,6 +143,9 @@ def setLevel(level) {
             break
     	case 1:
         	stay()
+            break
+    	case 2:
+        	instant()
             break
     	default:
         	away()
@@ -159,9 +162,11 @@ def setMode(mode) {
         	home()
             break
     	case 'stay':
-    	case 'instant':
     	case 'night':
         	stay()
+            break
+    	case 'instant':
+        	instant()
             break
     	case 'away':
         	away()
@@ -170,7 +175,7 @@ def setMode(mode) {
 }
 
 def on() {
-	away()
+	stay()
 }
 
 def off() {
@@ -178,13 +183,17 @@ def off() {
 }
 
 def home() {
-	parent.proxyCommand(device, 'mode', 'Home');
+	parent.proxyCommand(device, 'digital-life-mode', 'Home');
 }
 
 def stay() {
-	parent.proxyCommand(device, 'mode', 'Stay');
+	parent.proxyCommand(device, 'digital-life-mode', 'Stay');
+}
+
+def instant() {
+	parent.proxyCommand(device, 'digital-life-mode', 'Instant');
 }
 
 def away() {
-	parent.proxyCommand(device, 'mode', 'Away');
+	parent.proxyCommand(device, 'digital-life-mode', 'Away');
 }

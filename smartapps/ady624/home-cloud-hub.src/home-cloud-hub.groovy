@@ -24,7 +24,7 @@
  *
  *  Version history
  *
- *  v0.1.next //todo //location mode mappings
+ *  v0.1.06.21.16 - Added support for Instant, switch level is now 0/home, 1/stay, 2/instant, 3/away. Improved mode handling, replaced attribute "mode" with "digital-life-mode" as it was conflicting with the location mode
  *  v0.1.04.12.16 - Added support for AT&T Digital Life switch (switch is "off" when alarm is disarmed and "on" when the alarm is in stay/away/instant mode)
  *  v0.1.04.06.16b - Added support for switch level (sending event to set the level as well as the mode)
  *  v0.1.04.06.16 - Replaced Follow Location Mode with Sync Location Mode and added Sync Smart Home Monitor option for AT&T. Thank you Keo for the idea
@@ -486,7 +486,7 @@ def doMyQLogin(installing, force) {
 				if (response.data && response.data.SecurityToken) {
                     hch.security[module_name].securityToken = response.data.SecurityToken
                     hch.security[module_name].connected = now()
-                	hch.security[module_name].expires = now() + 7200000 //expires in 12 hours
+                	hch.security[module_name].expires = now() + 5000 //expires in 5 minutes
 					log.info "Successfully connected to MyQ"
                     hch.useMyQ = true
                 	return true;
@@ -638,9 +638,9 @@ def shmHandler(evt) {
     	children.each {
 	    	//look for the digital-life-system device
 	        if ((it.currentValue('module') == 'digitallife') && (it.currentValue('type') == 'digital-life-system')) {
-				if (mode != it.currentValue('mode')) {
+				if (mode != it.currentValue('digital-life-mode')) {
                 	log.info 'Requesting mode ' + mode + ' from ' + it.name
-                    proxyCommand it, 'mode', mode
+                    proxyCommand it, 'digital-life-mode', mode
                 }
 	        }
         }
@@ -672,9 +672,9 @@ def modeChangeHandler(event) {
             children.each {
                 //look for the digital-life-system device
                 if ((it.currentValue('module') == 'digitallife') && (it.currentValue('type') == 'digital-life-system')) {
-                    if (mode != it.currentValue('mode')) {
+                    if (mode != it.currentValue('digital-life-mode')) {
                         log.info 'Requesting mode ' + mode + ' from ' + it.name
-                        proxyCommand it, 'mode', mode
+                        proxyCommand it, 'digital-life-mode', mode
                     }
                 }
             }
@@ -810,7 +810,7 @@ private processEvent(data) {
     if (description) {
     	log.info 'Received event: ' + description
     } else {
-    	log.info "Received ${eventName} event for module ${deviceModule}, device ${deviceName}, value ${eventValue}"
+    	log.info "Received ${eventName} event for module ${deviceModule}, device ${deviceName}, value ${eventValue}, data: $data"
     }
 	// see if the specified device exists and create it if it does not exist
     def deviceDNI = (deviceModule + '-' + deviceId).toLowerCase();
@@ -855,7 +855,7 @@ private processEvent(data) {
 
                     //digital life alarm sync
                     if (true) {
-                        if ((deviceType == 'digital-life-system') && (key == 'system-status')) {
+                        if ((deviceType == 'digital-life-system') && (key == 'system-status') && (eventValue == value)) {
                             log.info "Digital Life alarm status changed from ${oldValue} to ${value}"
                             def mode = null;
                             def level = null;
@@ -870,7 +870,7 @@ private processEvent(data) {
                                     break
                                 case "Away":
                                     mode = "Away"
-                                    level = 2
+                                    level = 3
                                     sweetch = "on"
                                     shmState = "away"
                                     break
@@ -882,16 +882,16 @@ private processEvent(data) {
                                     break
                                 case "Instant":
                                     mode = "Night"
-                                    level = 1
+                                    level = 2
                                     sweetch = "on"
                                     shmState = "stay"
                                     break                        
                             }
 							if (mode) {
                             	//set device mode
-                                if (mode != device.currentValue('mode')) {
-                                    log.info 'Switching Digital Life mode from ' + device.currentValue('mode') + ' to ' + mode
-	                                device.sendEvent(name: 'mode', value: mode);
+                                if (value != device.currentValue('digital-life-mode')) {
+                                    log.info 'Switching Digital Life mode from ' + device.currentValue('digital-life-mode') + ' to ' + value
+	                                device.sendEvent(name: 'digital-life-mode', value: value);
                                     device.sendEvent(name: 'level', value: level);
                                     device.sendEvent(name: 'switch', value: sweetch);
                                 }
@@ -913,7 +913,7 @@ private processEvent(data) {
         	}
     	}
     }
-    if (state.hch.usesIFTTT && (eventName == 'update') && deviceModule && deviceId && eventName && eventValue && (eventValue != 'undefined')) {
+    if (state.hch.usesIFTTT && (eventName == 'update') && deviceModule && deviceId && eventName && eventValue && (eventValue != 'undefined') && !eventValue.contains("-ack") && !eventValue.contains("token")) {
     	//we need to proxy the event to IFTTT
         try {
         	def trigger = (deviceModule + '-' + deviceId + '-' + eventValue).replace(" ", "-").toLowerCase();
@@ -1038,7 +1038,7 @@ def cmd_digitallife(device, command, value, retry) {
     switch (device.currentValue("type")) {
     	case "digital-life-system":
         	switch (command) {
-            	case "mode":
+            	case "digital-life-mode":
                 	path = "alarm"
                     data = [
                     		bypass: '',

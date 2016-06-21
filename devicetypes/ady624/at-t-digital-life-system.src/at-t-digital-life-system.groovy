@@ -122,6 +122,7 @@ def parse(String description) {
 def describeAttributes(payload) {
 	payload.attributes = [
     	[ name: "system-status",	type: "enum",	options: ["Home", "Home Bypass", "Home ExitDelay", "Stay", "Stay AlarmPending", "Away", "Away AlarmPending", "Instant", "Instant AlarmPending"]	],
+    	[ name: "digital-life-mode",	type: "enum",	options: ["Home", "Stay", "Instant", "Away"]	],
     ]
     return null
 }

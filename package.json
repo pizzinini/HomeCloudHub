@@ -1,0 +1,11 @@
+{
+  "name" : "homecloudhub",
+  "dependencies" : {
+    "requests" : "*",
+    "colors" : "*",
+    "node-ssdp" : "*"
+  },
+  "scripts": {
+    "start" : "homecloudhub.local/homecloudhub.js"
+  }
+}

@@ -6,6 +6,6 @@
     "node-ssdp" : "*"
   },
   "scripts": {
-    "start" : "homecloudhub.local/homecloudhub.js"
+    "start" : "node homecloudhub.local/homecloudhub.js"
   }
 }

@@ -1,7 +1,7 @@
 {
   "name" : "homecloudhub",
   "dependencies" : {
-    "requests" : "*",
+    "request" : "*",
     "colors" : "*",
     "node-ssdp" : "*"
   },

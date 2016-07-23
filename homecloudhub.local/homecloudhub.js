@@ -17,6 +17,7 @@
 /* module paths - please add your own path for node_modules if not here already */
 module.paths.push('/usr/lib/node_modules');
 module.paths.push('/usr/local/lib/node_modules');
+module.paths.push('../.');
 
 var app = new function () {
     //modules

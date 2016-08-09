@@ -112,13 +112,19 @@ var exports = module.exports = new function () {
                                                     'id': dev.MyQDeviceId,
                                                     'name': dev.TypeName.replace(' Opener', ''),
                                                     'module': module,
-                                                    'type': dev.MyQDeviceTypeName,
+                                                    'type': dev.MyQDeviceTypeName.replace('VGDO', 'GarageDoorOpener'),
                                                     'serial': dev.SerialNumber
                                                 };
                                                 for (prop in dev.Attributes) {
                                                     var attr = dev.Attributes[prop];
                                                     doSetDeviceAttribute(device, attr.Name, attr.Value);
                                                 }
+                                                
+                                                //Rename device with actual MYQ door name
+                                                if (device['data-description'] != ''){
+                                                    device.name = device['data-description'];    
+                                                }                                                
+                                                
                                                 var existing = false;
                                                 var notify = false;
                                                 //we only push updates to other modules if there are any changes made
@@ -158,6 +164,7 @@ var exports = module.exports = new function () {
                                                     }
                                                 }
                                                 if (!existing) {
+                                                if (!existing && device.type != 'Gateway' && device['data-description'] != '') {
                                                     devices.push(device);
                                                     callback({
                                                         name: 'discovery',

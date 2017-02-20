@@ -42,6 +42,10 @@ metadata {
 		reply "200100,delay 100,2502": "command: 2503, payload: 00"
 
 	}
+    
+	preferences {
+	    input name: "mode", type: "enum", options: ["Safety", "Security"], title: "Lock type", description: "Please select the type of lock", required: true, defaultValue: "Safety", displayDuringSetup: true
+	}    
 
 	// tile definitions
 	tiles {
@@ -94,15 +98,19 @@ def zwaveEvent(physicalgraph.zwave.commands.meterv2.MeterReport cmd) {
 
 def zwaveEvent(physicalgraph.zwave.commands.basicv1.BasicReport cmd)
 {
+	def valueTrue = settings.mode == "Security" ? "unlocked" : "locked"
+    def valueFalse = settings.mode == "Security" ? "locked" : "unlocked"
 	[
-		name: "lock", value: cmd.value ? "unlocked" : "locked", type: "physical"
+		name: "lock", value: cmd.value ? valueTrue : valueFalse, type: "physical"
 	]
 }
 
 def zwaveEvent(physicalgraph.zwave.commands.switchbinaryv1.SwitchBinaryReport cmd)
 {
+	def valueTrue = settings.mode == "Security" ? "unlocked" : "locked"
+    def valueFalse = settings.mode == "Security" ? "locked" : "unlocked"
 	[
-		name: "lock", value: cmd.value ? "unlocked" : "locked", type: "digital"
+		name: "lock", value: cmd.value ? valueTrue : valueFalse, type: "digital"
 	]
 }
 
@@ -113,14 +121,14 @@ def zwaveEvent(physicalgraph.zwave.Command cmd) {
 
 def unlock() {
 	delayBetween([
-		zwave.basicV1.basicSet(value: 0xFF).format(),
+		zwave.basicV1.basicSet(value: settings.mode == 'Security' ? 0xFF : 0x00).format(),
 		zwave.switchBinaryV1.switchBinaryGet().format()
 	])
 }
 
 def lock() {
 	delayBetween([
-		zwave.basicV1.basicSet(value: 0x00).format(),
+		zwave.basicV1.basicSet(value: settings.mode == 'Security' ? 0x00 : 0xFF).format(),
 		zwave.switchBinaryV1.switchBinaryGet().format()
 	])
 }

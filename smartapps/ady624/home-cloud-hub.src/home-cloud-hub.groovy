@@ -24,6 +24,7 @@
  *
  *  Version history
  *
+ *  v0.1.06.13.17 - Lowered the wait time for SSDP response to 5s, because ST lowered the page rendering time out to 10s
  *  v0.1.06.21.16 - Added support for Instant, switch level is now 0/home, 1/stay, 2/instant, 3/away. Improved mode handling, replaced attribute "mode" with "digital-life-mode" as it was conflicting with the location mode
  *  v0.1.04.12.16 - Added support for AT&T Digital Life switch (switch is "off" when alarm is disarmed and "on" when the alarm is in stay/away/instant mode)
  *  v0.1.04.06.16b - Added support for switch level (sending event to set the level as well as the mode)
@@ -46,7 +47,7 @@ definition(
     oauth: true)
 
 private getMyQAppId() {
-    return 'Vj8pQggXLhLy0WHahglCD4N1nAkkXQtGYpq2HrHD7H1nvmbT55KqtN6RSF4ILB/i'
+//    return 'Vj8pQggXLhLy0WHahglCD4N1nAkkXQtGYpq2HrHD7H1nvmbT55KqtN6RSF4ILB/i'
 	return 'JVM/G9Nwih5BwKgNCjLxiFUQxQijAebyyg8QUHr7JOrP+tuPb8iHfRHKwTmDzHOu'
 }
 
@@ -109,13 +110,14 @@ def prefHCH(params) {
             def cnt = 50
             def hchLocalServerIp = null
             while (cnt--) {
-            	pause(200)
+            	pause(100)
                 hchLocalServerIp = atomicState.hchLocalServerIp
                 if (hchLocalServerIp) {
                 	state.ihch.localServerIp = hchLocalServerIp
                 	break
                 }
             }
+            log.trace "Stopped waiting..."
             section("Automatic configuration") {
 				if (hchLocalServerIp) {
 					href(name: "href",
@@ -160,10 +162,14 @@ def prefModulesPrepare(params) {
     }
     
     if (doHCHLogin()) {
+    log.trace "HERE 1"
 	    //prefill states for the modules
     	doATTLogin(true, true)
-    	doMyQLogin(true, true)
+    log.trace "HERE 2"
+    	//doMyQLogin(true, true)
+    log.trace "HERE 3"
     	doIFTTTLogin(true, true)
+    log.trace "HERE 4"
 		return prefModules()
 	} else {
     	if (state.ihch.useLocalServer) {
@@ -340,16 +346,17 @@ def prefIFTTTConfirm() {
 /* Login to Home Cloud Hub                                             */
 /***********************************************************************/
 private doHCHLogin() {
+	try {
 	if (state.ihch.useLocalServer) {
         atomicState.hchPong = false
 
 		log.trace "Pinging local server at " + state.ihch.localServerIp
-        sendLocalServerCommand state.ihch.localServerIp, "ping", ""
+        sendLocalServerCommand state.ihch.localServerIp, "ping", [:]
 
 		def cnt = 50
         def hchPong = false
         while (cnt--) {
-            pause(200)
+            pause(100)
             hchPong = atomicState.hchPong
             if (hchPong) {
                 return true
@@ -374,12 +381,14 @@ private doHCHLogin() {
             }
         }
 	}
+	} catch (e) { log.error "Error logging in to HCH...", e }
 }
 
 /***********************************************************************/
 /* Login to AT&T Digital Life                                          */
 /***********************************************************************/
 private doATTLogin(installing, force) {
+	try {
 	def module_name = 'digitallife';
     //if cookies haven't expired and unless we need to force a login, we report all is pink
     if (!installing && !force && state.hch.security[module_name] && state.hch.security[module_name].connected && (state.hch.security[module_name].expires > now())) {
@@ -456,12 +465,14 @@ private doATTLogin(installing, force) {
 	} else {
     	return true;
     }
+    } catch(e) { log.error "Error logging in to AT&T", e }
 }
 
 /***********************************************************************/
 /* Login to MyQ                                                        */
 /***********************************************************************/
 def doMyQLogin(installing, force) {
+	try {
 	def module_name = 'myq';
     //if cookies haven't expired and unless we need to force a login, we report all is pink
     if (!installing && !force && state.hch.security[module_name] && state.hch.security[module_name].connected && (state.hch.security[module_name].expires > now())) {
@@ -480,8 +491,30 @@ def doMyQLogin(installing, force) {
     	log.info "Logging in to MyQ..."
         //perform the login, retrieve token
         def myQAppId = getMyQAppId()
-        return httpGet("https://myqexternal.myqdevice.com/Membership/ValidateUserWithCulture?appId=${myQAppId}&securityToken=null&username=${settings.myqUsername}&password=${settings.myqPassword}&culture=en") { response ->
+        //return httpGet("https://myqexternal.myqdevice.com/Membership/ValidateUserWithCulture?appId=${myQAppId}&securityToken=null&username=${settings.myqUsername}&password=${settings.myqPassword}&culture=en") { response ->
+        return httpPost([
+        	uri: "https://myqexternal.myqdevice.com",
+            path:"/api/v4/User/Validate",
+            headers: [
+            	"BrandId": "2",
+                "ApiVersion": "4.1",
+                "User-Agent": "Chamberlain/3.73 (iPhone; iOS 10.1; Scale/2.00)",
+                MyQApplicationId: "NWknvuBd7LoFHfXmKNMBcgajXtZEgKUh4V7WNzMidrpUUluDpVYVZx+xT4PCM5Kx"
+            ],
+            contentType: "text/plain",
+            body: [
+            	"username": "ady624@gmail.com",
+                "password": "Adrian_625"
+			]
+		]) { response ->
+        //return httpGet([uri: "https://myqexternal.myqdevice.com", path:"/api/user/validate", query: [appId: myQAppId, username: settings.myqUsername, password: settings.myqPassword]]) { response ->
 			//check response, continue if 200 OK
+            def s = "";
+ 			for (int i = 0; i < 5; i++) {
+            	s = s + (char) response.data.read();
+         	}            
+            log.trace response.status
+            log.trace s
        		if (response.status == 200) {
 				if (response.data && response.data.SecurityToken) {
                     hch.security[module_name].securityToken = response.data.SecurityToken
@@ -497,12 +530,14 @@ def doMyQLogin(installing, force) {
     } else {
 		return true;
 	}
+    } catch(e) { log.error "Error logging in to MyQ", e }
 }
 
 /***********************************************************************/
 /* Login to IFTTT                                                      */
 /***********************************************************************/
 def doIFTTTLogin(installing, force) {
+	try {
     //setup our security descriptor
     def hch = (installing ? state.ihch : state.hch)
     hch.useIFTTT = false
@@ -519,6 +554,7 @@ def doIFTTTLogin(installing, force) {
     } else {
 		return true;
 	}
+    } catch(e) { log.error "Error logging in to IFTTT", e }
 }
 
 
@@ -584,6 +620,7 @@ def initialize() {
     
 	state.hch.usesATT = !!(settings.attUsername || settings.attPassword)
 	state.hch.usesIFTTT = !!settings.iftttKey
+	state.hch.usesMyQ = !!(settings.myqUsername || settings.myqPassword)
     
     if ((state.hch.usesATT) && (settings.attControllable)) {
     	if (settings.attSyncLocationMode) {
@@ -696,9 +733,11 @@ def lanEventHandler(evt) {
     def description = evt.description
     def hub = evt?.hubId
 	def parsedEvent = parseLanMessage(description)
+	//log.trace "RECEIVED LAN EVENT: $parsedEvent"
 	
 	//discovery
 	if (parsedEvent.ssdpTerm && parsedEvent.ssdpTerm.contains(getLocalServerURN())) {
+    	log.trace "DISCOVERY SUCCESSFUL"
         atomicState.hchLocalServerIp = convertHexToIP(parsedEvent.networkAddress)
 	}
     
@@ -712,6 +751,7 @@ def lanEventHandler(evt) {
         }   	
     }
     if (parsedEvent.data && parsedEvent.data.event) {
+	    log.trace "GOT LAN EVENT ${parsedEvent.data.event} and data ${parsedEvent.data.data}"
         switch (parsedEvent.data.event) {
         	case "init":
                 sendLocalServerCommand state.hch.localServerIp, "init", [
@@ -728,14 +768,19 @@ def lanEventHandler(evt) {
 }
 
 private sendLocalServerCommand(ip, command, payload) {
-    sendHubCommand(new physicalgraph.device.HubAction(
-        method: "GET",
-        path: "/${command}",
-        headers: [
-            HOST: "${ip}:42457"
-        ],
-        query: payload ? [payload: groovy.json.JsonOutput.toJson(payload).bytes.encodeBase64()] : []
-    ))
+	try {
+        ip = ip ?: state.sch.localServerIp
+        log.trace "Received command $command with payload $payload"
+        log.trace payload
+        sendHubCommand(new physicalgraph.device.HubAction(
+            method: "GET",
+            path: "/${command}",
+            headers: [
+                HOST: "${ip}:42457"
+            ],
+            query: payload ? [payload: groovy.json.JsonOutput.toJson(payload).bytes.encodeBase64()] : []
+        ))
+	} catch (e) { log.error "Got an error...", e }
 }
 
 
@@ -810,7 +855,7 @@ private processEvent(data) {
     if (description) {
     	log.info 'Received event: ' + description
     } else {
-    	log.info "Received ${eventName} event for module ${deviceModule}, device ${deviceName}, value ${eventValue}, data: $data"
+    	log.info "Received ${eventName} event for module ${deviceModule}, device ${deviceName} of type ${deviceType}, value ${eventValue}, data: $data"
     }
 	// see if the specified device exists and create it if it does not exist
     def deviceDNI = (deviceModule + '-' + deviceId).toLowerCase();
@@ -845,6 +890,9 @@ private processEvent(data) {
         for(param in data) {
             def key = param.key
         	def value = param.value
+            if (deviceId != device.currentValue("id")) {
+            	device.sendEvent(name: "id", value: deviceId);
+            }
         	if ((key.size() > 5) && (key.substring(0, 5) == 'data-')) {
             	key = key.substring(5);
                 def oldValue = device.currentValue(key);
@@ -1105,7 +1153,7 @@ def cmd_digitallife(device, command, value, retry) {
 def cmd_myq(device, command, value, retry) {
 	//are we allowed to use MyQ?
    	def module_name = "myq"
-	if (!state.hch.useMyQ || !(state.hch.security && state.hch.security[module_name] && state.hch.security[module_name].controllable)) {
+	if (!state.hch.usesMyQ || !(state.hch.security && state.hch.security[module_name] && state.hch.security[module_name].controllable)) {
     	//we are either not using this module or we can't controll it
     	return "No permission to control MyQ"
     }
@@ -1164,7 +1212,9 @@ def cmd_myq(device, command, value, retry) {
                 return "cmd_${module_name}"(device, command, value, true)
             }
 		} catch(e) {
-    		message = "Failed sending command to MyQ: ${e}"
+    		message = "Failed sending command to MyQ: ${e}, falling back on HCH"
+            sendLocalServerCommand state.hch.localServerIp, "cmd", [module: module_name, deviceId: device.currentValue('id'), command: command]
         }
     }
+    return message
 }

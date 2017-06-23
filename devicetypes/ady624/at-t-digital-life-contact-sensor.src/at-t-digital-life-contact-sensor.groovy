@@ -31,14 +31,14 @@ metadata {
 	// UI tile definitions
 	tiles(scale: 2) {
 		standardTile("contact", "device.contact", width: 2, height: 2) {
-            state "open", label: '${name}', icon: "st.contact.contact.open", backgroundColor: "#ffa81e", canChangeIcon: true, canChangeBackground: true
-            state "closed", label: '${name}', icon: "st.contact.contact.closed", backgroundColor: "#79b821", canChangeIcon: true, canChangeBackground: true
+            state "open", label: '${name}', icon: "st.contact.contact.open", backgroundColor: "#e86d13", canChangeIcon: true, canChangeBackground: true
+            state "closed", label: '${name}', icon: "st.contact.contact.closed", backgroundColor: "#00a0dc", canChangeIcon: true, canChangeBackground: true
         }
 
 		multiAttributeTile(name:"multi", type:"generic", width:6, height:4) {
 			tileAttribute("device.contact", key: "PRIMARY_CONTROL") {
-      			attributeState "open", label: '${name}', icon:"st.contact.contact.open", backgroundColor:"#ffa81e"
-      			attributeState "closed", label:'${name}', icon:"st.contact.contact.closed", backgroundColor:"#79b821"
+      			attributeState "open", label: '${name}', icon:"st.contact.contact.open", backgroundColor:"#e86d13"
+      			attributeState "closed", label:'${name}', icon:"st.contact.contact.closed", backgroundColor:"#00a0dc"
     		}
     		tileAttribute("device.battery", key: "SECONDARY_CONTROL") {
       			attributeState "default", label: 'Battery ${currentValue}%', icon:"st.unknown.unknown", backgroundColor:"#ffa81e", unit:"%"
